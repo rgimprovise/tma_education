@@ -1,0 +1,47 @@
+# Caddyfile для MINTO Bot
+# Backend API и TMA Frontend
+
+# Замените your-domain.com на ваш домен или используйте IP
+# Для IP: замените на http://79.132.140.13
+
+# Backend API (NestJS)
+api.your-domain.com {
+    reverse_proxy localhost:3000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+
+# TMA Frontend (React/Vite)
+tma.your-domain.com {
+    root * /var/www/tma_education/tma/dist
+    file_server
+    try_files {path} /index.html
+    
+    # Проксируем API запросы к backend
+    handle /api/* {
+        reverse_proxy localhost:3000 {
+            rewrite /api /strip_prefix
+        }
+    }
+}
+
+# Альтернативный вариант: один домен с разными путями
+# your-domain.com {
+#     # Backend API
+#     handle /api/* {
+#         reverse_proxy localhost:3000 {
+#             rewrite /api /strip_prefix
+#         }
+#     }
+#     
+#     # TMA Frontend
+#     handle {
+#         root * /var/www/tma_education/tma/dist
+#         file_server
+#         try_files {path} /index.html
+#     }
+# }
+
