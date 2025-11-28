@@ -1,0 +1,27 @@
+{
+  "name": "minto-course",
+  "version": "1.0.0",
+  "description": "Система обучения «Пирамида Минто» - Backend + Telegram Mini App",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "tma"
+  ],
+  "scripts": {
+    "dev:backend": "cd backend && npm run start:dev",
+    "dev:tma": "cd tma && npm run dev",
+    "build:backend": "cd backend && npm run build",
+    "build:tma": "cd tma && npm run build",
+    "install:all": "npm install && cd backend && npm install && cd ../tma && npm install"
+  },
+  "keywords": [
+    "telegram",
+    "miniapp",
+    "education",
+    "nestjs",
+    "react"
+  ],
+  "author": "",
+  "license": "UNLICENSED"
+}
+

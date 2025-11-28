@@ -1,0 +1,48 @@
+.learners-list {
+  margin-top: 24px;
+}
+
+.learner-card {
+  position: relative;
+}
+
+.learner-stats {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.stat-label {
+  color: var(--tg-theme-hint-color, #999999);
+  font-weight: 500;
+}
+
+.stat-value {
+  color: var(--tg-theme-text-color, #000000);
+}
+
+.pending-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background-color: #ff9800;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--tg-theme-hint-color, #999999);
+}
+

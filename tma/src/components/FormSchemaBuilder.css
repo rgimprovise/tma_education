@@ -1,0 +1,86 @@
+.form-schema-builder {
+  margin-top: 16px;
+}
+
+.empty-form {
+  text-align: center;
+  padding: 24px;
+  background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
+  border-radius: 8px;
+}
+
+.empty-form p {
+  margin-bottom: 16px;
+  color: var(--tg-theme-hint-color, #999999);
+  font-size: 14px;
+}
+
+.form-field-editor {
+  padding: 16px;
+  background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.field-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.field-number {
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #000000);
+  font-size: 14px;
+}
+
+.delete-field-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.delete-field-btn:hover {
+  opacity: 1;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.field-group {
+  margin-bottom: 12px;
+}
+
+.field-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--tg-theme-text-color, #000000);
+}
+
+.field-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background-color: var(--tg-theme-bg-color, #ffffff);
+  color: var(--tg-theme-text-color, #000000);
+}
+
+.field-input:focus {
+  outline: none;
+  border-color: var(--tg-theme-button-color, #0088cc);
+}
+

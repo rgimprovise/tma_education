@@ -1,0 +1,163 @@
+import { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { DashboardPage } from './pages/DashboardPage';
+import { ModulePage } from './pages/ModulePage';
+import { StepPage } from './pages/StepPage';
+import { SubmissionsPage } from './pages/SubmissionsPage';
+import { LoginPage } from './pages/LoginPage';
+import { CuratorDashboardPage } from './pages/CuratorDashboardPage';
+import { CuratorUserPage } from './pages/CuratorUserPage';
+import { CourseBuilderPage } from './pages/CourseBuilderPage';
+import { CourseModuleEditorPage } from './pages/CourseModuleEditorPage';
+import { CourseStepsPage } from './pages/CourseStepsPage';
+import { CourseStepEditorPage } from './pages/CourseStepEditorPage';
+import './App.css';
+
+function App() {
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    // Инициализация Telegram WebApp
+    if (window.Telegram?.WebApp) {
+      const tg = window.Telegram.WebApp;
+      tg.ready();
+      tg.expand();
+      
+      // Настройка темы
+      tg.setHeaderColor(tg.themeParams.bg_color || '#ffffff');
+      tg.setBackgroundColor(tg.themeParams.bg_color || '#ffffff');
+    } else {
+      // Для разработки вне Telegram
+      console.warn('Telegram WebApp not available. Running in dev mode.');
+    }
+    
+    setIsReady(true);
+  }, []);
+
+  if (!isReady) {
+    return (
+      <div className="loading">
+        <div>Загрузка...</div>
+      </div>
+    );
+  }
+
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          
+          {/* Роуты для обучающихся */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['LEARNER']}>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/modules/:moduleId"
+            element={
+              <ProtectedRoute allowedRoles={['LEARNER']}>
+                <ModulePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/steps/:stepId"
+            element={
+              <ProtectedRoute allowedRoles={['LEARNER']}>
+                <StepPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/submissions"
+            element={
+              <ProtectedRoute allowedRoles={['LEARNER']}>
+                <SubmissionsPage />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* Роуты для кураторов */}
+          <Route
+            path="/curator"
+            element={
+              <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
+                <CuratorDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/curator/users/:userId"
+            element={
+              <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
+                <CuratorUserPage />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* Роуты для конструктора курса */}
+          <Route
+            path="/curator/course"
+            element={
+              <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
+                <CourseBuilderPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/curator/course/modules/new"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <CourseModuleEditorPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/curator/course/modules/:moduleId"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <CourseModuleEditorPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/curator/course/modules/:moduleId/steps"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <CourseStepsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/curator/course/modules/:moduleId/steps/new"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <CourseStepEditorPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/curator/course/modules/:moduleId/steps/:stepId"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <CourseStepEditorPage />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route path="/" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
+
+export default App;
+

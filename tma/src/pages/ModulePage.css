@@ -1,0 +1,48 @@
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--tg-theme-text-color, #000000);
+}
+
+.step-card {
+  margin-bottom: 12px;
+}
+
+.step-submission-info {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+}
+
+.step-status-not-started {
+  background-color: #f5f5f5;
+  color: #666666;
+}
+
+.step-status-sent {
+  background-color: #fff3e0;
+  color: #f57c00;
+}
+
+.step-status-reviewing {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.step-status-approved {
+  background-color: #e8f5e9;
+  color: #388e3c;
+}
+
+.step-status-returned {
+  background-color: #ffebee;
+  color: #d32f2f;
+}
+
+.step-score {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color, #999999);
+  margin-top: 4px;
+}
+

@@ -1,0 +1,70 @@
+.step-content {
+  margin-bottom: 24px;
+}
+
+.content-text {
+  white-space: pre-wrap;
+  line-height: 1.6;
+  color: var(--tg-theme-text-color, #000000);
+}
+
+.step-form {
+  margin-top: 24px;
+}
+
+.submission-info {
+  margin-top: 16px;
+  padding: 16px;
+  background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
+  border-radius: 8px;
+}
+
+.submission-status {
+  font-weight: 500;
+  margin-bottom: 12px;
+  color: var(--tg-theme-text-color, #000000);
+}
+
+.feedback-block {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+}
+
+.feedback-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--tg-theme-text-color, #000000);
+}
+
+.feedback-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--tg-theme-text-color, #000000);
+  white-space: pre-wrap;
+}
+
+.form-textarea:disabled {
+  background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.dynamic-form {
+  margin-top: 16px;
+}
+
+.required-mark {
+  color: #d32f2f;
+}
+
+.file-input-hint {
+  margin-top: 8px;
+}
+
+.file-input-hint p {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color, #999999);
+  margin-bottom: 8px;
+}
+

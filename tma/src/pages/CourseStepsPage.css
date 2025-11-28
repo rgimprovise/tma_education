@@ -1,0 +1,44 @@
+.steps-list {
+  margin-top: 24px;
+}
+
+.step-card {
+  margin-bottom: 12px;
+}
+
+.step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.step-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #000000);
+  flex: 1;
+}
+
+.step-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.step-type {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color, #999999);
+}
+
+.required-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: #4caf50;
+  color: white;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+

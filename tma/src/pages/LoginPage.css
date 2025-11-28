@@ -1,0 +1,28 @@
+.login-page {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 16px;
+  text-align: center;
+}
+
+.loading {
+  font-size: 16px;
+  color: var(--tg-theme-hint-color, #999999);
+}
+
+.error-message {
+  color: #d32f2f;
+  font-size: 16px;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.error-hint {
+  font-size: 14px;
+  color: var(--tg-theme-hint-color, #999999);
+  max-width: 300px;
+}
+
