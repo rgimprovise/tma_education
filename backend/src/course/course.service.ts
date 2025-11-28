@@ -106,6 +106,7 @@ export class CourseService {
 
       return {
         ...module,
+        steps: undefined, // Не включаем steps в ответ для списка модулей
         enrollment: enrollment
           ? {
               id: enrollment.id,

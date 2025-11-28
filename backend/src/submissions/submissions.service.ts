@@ -439,14 +439,16 @@ export class SubmissionsService {
       orderBy: { createdAt: 'desc' },
     });
   }
-}
 
   /**
    * Проверяет, завершён ли модуль, и обновляет статус Enrollment
    * Модуль считается завершённым, если все обязательные шаги имеют
    * Submission со статусом CURATOR_APPROVED
    */
-  private async checkAndCompleteModule(moduleId: string, userId: string): Promise<void> {
+  private async checkAndCompleteModule(
+    moduleId: string,
+    userId: string,
+  ): Promise<void> {
     // Получаем модуль со всеми шагами
     const module = await this.prisma.courseModule.findUnique({
       where: { id: moduleId },
