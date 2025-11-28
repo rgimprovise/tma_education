@@ -48,19 +48,6 @@ export function CuratorDashboardPage() {
     loadLearners();
   }, []);
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'LOCKED':
-        return '🔒';
-      case 'IN_PROGRESS':
-        return '📚';
-      case 'COMPLETED':
-        return '✅';
-      default:
-        return '';
-    }
-  };
-
   if (loading) {
     return (
       <div className="container">

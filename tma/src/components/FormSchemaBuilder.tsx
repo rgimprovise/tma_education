@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import './FormSchemaBuilder.css';
 
 export interface FormField {

@@ -91,7 +91,7 @@ export function CuratorUserPage() {
     try {
       setUnlocking(moduleId);
       
-      const response = await api.post(`/admin/modules/${moduleId}/unlock`, {
+      await api.post(`/admin/modules/${moduleId}/unlock`, {
         userIds: [userId],
       });
 

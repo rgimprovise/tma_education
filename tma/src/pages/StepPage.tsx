@@ -166,7 +166,6 @@ export function StepPage() {
   }
 
   const hasSubmission = step.submission !== null && step.submission !== undefined;
-  const isApproved = step.submission?.status === 'CURATOR_APPROVED';
   const isReturned = step.submission?.status === 'CURATOR_RETURNED';
 
   return (
@@ -246,7 +245,7 @@ export function StepPage() {
 
           {error && <div className="error">{error}</div>}
 
-          {hasSubmission && (
+          {hasSubmission && step.submission && (
             <div className="submission-info">
               <div className="submission-status">
                 Статус: {step.submission.status}
