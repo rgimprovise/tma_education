@@ -41,15 +41,21 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     try {
       this.setupHandlers();
       
-      // Запускаем бота через polling (для разработки)
+      // Запускаем бота через polling в фоновом режиме (для разработки)
       // В production можно использовать webhook
-      await this.bot.start();
-      this.isRunning = true;
+      // Не используем await, чтобы не блокировать запуск основного приложения
+      this.bot.start().then(() => {
+        this.isRunning = true;
+        this.bot.api.getMe().then((botInfo) => {
+          this.logger.log(`🤖 Telegram Bot started: @${botInfo.username}`);
+        });
+      }).catch((error) => {
+        this.logger.error('Failed to start Telegram Bot:', error);
+      });
       
-      const botInfo = await this.bot.api.getMe();
-      this.logger.log(`🤖 Telegram Bot started: @${botInfo.username}`);
+      this.logger.log('Telegram Bot initialization started...');
     } catch (error) {
-      this.logger.error('Failed to start Telegram Bot:', error);
+      this.logger.error('Error initializing Telegram Bot:', error);
     }
   }
 
