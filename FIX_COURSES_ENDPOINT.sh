@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Быстрое исправление: пересборка backend для endpoints курсов
+# Проблема: CourseCoursesController и CoursesService не были скомпилированы
+
+set -e
+
+echo "🔧 Исправление: пересборка backend для /admin/courses"
+echo "========================================================"
+
+# 1. Получить последние изменения
+echo ""
+echo "📥 Получение обновлений..."
+git pull
+
+# 2. Пересобрать backend
+echo ""
+echo "🔨 Сборка backend..."
+cd backend
+npm run build
+
+# 3. Перезапустить backend
+echo ""
+echo "🔄 Перезапуск backend..."
+pm2 restart minto-backend
+
+# 4. Проверить логи
+echo ""
+echo "📋 Последние логи backend:"
+pm2 logs minto-backend --lines 20 --nostream
+
+echo ""
+echo "✅ Готово!"
+echo ""
+echo "Проверьте endpoints:"
+echo "  curl -I https://tma.n8nrgimprovise.space/api/admin/courses"
+echo ""
+echo "Теперь TMA должна работать корректно на вкладке 'Курсы'"
+
