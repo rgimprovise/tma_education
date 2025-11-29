@@ -318,16 +318,18 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
    * @param telegramId - Telegram ID пользователя
    * @param text - Текст сообщения
    * @param options - Дополнительные опции (клавиатура, parse_mode и т.д.)
+   * @returns Объект отправленного сообщения с message_id
    */
-  async sendMessage(telegramId: string, text: string, options?: any): Promise<void> {
+  async sendMessage(telegramId: string, text: string, options?: any): Promise<any> {
     if (!this.bot || !this.isRunning) {
       this.logger.warn('Bot is not running. Cannot send message.');
-      return;
+      throw new Error('Bot is not running');
     }
 
     try {
-      await this.bot.api.sendMessage(telegramId, text, options);
-      this.logger.debug(`Message sent to ${telegramId}`);
+      const sentMessage = await this.bot.api.sendMessage(telegramId, text, options);
+      this.logger.debug(`Message sent to ${telegramId}, message_id: ${sentMessage.message_id}`);
+      return sentMessage;
     } catch (error: any) {
       this.logger.error(`Failed to send message to ${telegramId}:`, error.message);
       throw error;
