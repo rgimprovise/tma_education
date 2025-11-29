@@ -53,8 +53,14 @@ export function CourseDashboardPage() {
   };
 
   const handleModuleClick = (moduleId: string) => {
-    // В будущем: переход на дашборд модуля
-    // Пока: переход в редактор модуля
+    // Переход на просмотр модуля (в будущем - дашборд модуля)
+    // Пока можно сделать переход к шагам модуля
+    navigate(`/curator/course/modules/${moduleId}/steps`);
+  };
+
+  const handleEditModule = (moduleId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Переход в редактор модуля
     navigate(`/curator/course/modules/${moduleId}`);
   };
 
@@ -114,9 +120,15 @@ export function CourseDashboardPage() {
   // Подсчёт общей статистики по курсу
   const totalModules = course.modules.length;
   const totalSteps = course.modules.reduce((sum, m) => sum + m.stepsCount, 0);
-  const totalLearners = course.modules.reduce((sum, m) => sum + m.enrollmentsCount, 0);
-  // Уникальные участники (в будущем можно сделать точнее)
+  
+  // Уникальные участники по курсу (грубая оценка - максимум enrollments по модулям)
   const uniqueLearners = Math.max(...course.modules.map(m => m.enrollmentsCount), 0);
+  
+  // Количество модулей с хотя бы одним enrollment (открытые модули)
+  const modulesWithEnrollments = course.modules.filter(m => m.enrollmentsCount > 0).length;
+  
+  // Количество закрытых модулей
+  const lockedModules = totalModules - modulesWithEnrollments;
 
   return (
     <div className="course-dashboard">
@@ -146,6 +158,62 @@ export function CourseDashboardPage() {
         </div>
       </div>
 
+      {/* Блок статистики по курсу */}
+      <div className="stats-section">
+        <h2 className="section-title">Статистика по курсу</h2>
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-icon-large">📖</div>
+            <div className="stat-content">
+              <div className="stat-value">{totalModules}</div>
+              <div className="stat-label">
+                {totalModules === 1 ? 'Модуль' : totalModules < 5 ? 'Модуля' : 'Модулей'}
+              </div>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon-large">📝</div>
+            <div className="stat-content">
+              <div className="stat-value">{totalSteps}</div>
+              <div className="stat-label">
+                {totalSteps === 1 ? 'Шаг' : totalSteps < 5 ? 'Шага' : 'Шагов'}
+              </div>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon-large">👥</div>
+            <div className="stat-content">
+              <div className="stat-value">{uniqueLearners}</div>
+              <div className="stat-label">
+                {uniqueLearners === 1 ? 'Участник' : uniqueLearners < 5 ? 'Участника' : 'Участников'}
+              </div>
+              {uniqueLearners > 0 && (
+                <div className="stat-hint">
+                  Зарегистрировано в курсе
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon-large">🔓</div>
+            <div className="stat-content">
+              <div className="stat-value">{modulesWithEnrollments}</div>
+              <div className="stat-label">
+                {modulesWithEnrollments === 1 ? 'Модуль открыт' : modulesWithEnrollments < 5 ? 'Модуля открыто' : 'Модулей открыто'}
+              </div>
+              {lockedModules > 0 && (
+                <div className="stat-hint">
+                  🔒 {lockedModules} {lockedModules === 1 ? 'закрыт' : 'закрыто'}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="modules-section">
         <div className="section-header">
           <h2 className="section-title">Модули курса</h2>
@@ -169,15 +237,19 @@ export function CourseDashboardPage() {
                 key={module.id}
                 className="module-card"
               >
-                <div 
-                  className="module-card-content"
-                  onClick={() => handleModuleClick(module.id)}
-                >
+                <div className="module-card-content">
                   <div className="module-card-header">
-                    <h3 className="module-card-title">
-                      {module.isExam ? '🎓' : '📖'} {module.title}
-                    </h3>
-                    <span className="module-card-index">Модуль {module.index}</span>
+                    <div className="module-title-wrapper">
+                      <h3 className="module-card-title">
+                        {module.isExam ? '🎓' : '📖'} {module.title}
+                      </h3>
+                      <div className="module-badges">
+                        <span className="module-card-index">Модуль {module.index}</span>
+                        {module.isExam && (
+                          <span className="module-badge exam-badge">Экзамен</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {module.description && (
@@ -199,9 +271,18 @@ export function CourseDashboardPage() {
                     </div>
                   </div>
 
-                  {module.isExam && (
-                    <div className="module-badge exam-badge">Экзамен</div>
-                  )}
+                  {/* Статус модуля */}
+                  <div className="module-status">
+                    {module.enrollmentsCount > 0 ? (
+                      <div className="status-badge status-unlocked">
+                        🔓 Открыт для {module.enrollmentsCount} {module.enrollmentsCount === 1 ? 'ученика' : module.enrollmentsCount < 5 ? 'учеников' : 'учеников'}
+                      </div>
+                    ) : (
+                      <div className="status-badge status-locked">
+                        🔒 Ни для кого не открыт
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="module-card-actions">
@@ -211,6 +292,12 @@ export function CourseDashboardPage() {
                     disabled={unlockingModuleId === module.id}
                   >
                     {unlockingModuleId === module.id ? '🔄 Открываю...' : '🔓 Открыть для всех'}
+                  </button>
+                  <button
+                    className="btn-edit"
+                    onClick={(e) => handleEditModule(module.id, e)}
+                  >
+                    ✏️ Редактировать
                   </button>
                 </div>
               </div>
