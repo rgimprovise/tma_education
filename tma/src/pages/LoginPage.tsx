@@ -12,6 +12,12 @@ export function LoginPage() {
     if (isLoading) return;
 
     if (user) {
+      // Проверяем, завершён ли профиль (регистрация через бота)
+      if (!user.profileCompleted || !user.firstName || !user.lastName) {
+        navigate('/incomplete-profile');
+        return;
+      }
+
       // Редирект в зависимости от роли
       if (user.role === 'CURATOR' || user.role === 'ADMIN') {
         navigate('/curator');

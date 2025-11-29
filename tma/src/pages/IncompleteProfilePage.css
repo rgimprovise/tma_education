@@ -1,0 +1,91 @@
+.incomplete-profile-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.incomplete-profile-content {
+  background: white;
+  border-radius: 16px;
+  padding: 32px 24px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.icon-large {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.incomplete-profile-content .title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 12px;
+}
+
+.incomplete-profile-content .description {
+  font-size: 16px;
+  color: #4a5568;
+  margin-bottom: 24px;
+}
+
+.instructions {
+  background: #f7fafc;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.instruction-step {
+  font-size: 14px;
+  color: #2d3748;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.instruction-step:last-child {
+  margin-bottom: 0;
+}
+
+.instruction-step code {
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: #2d3748;
+}
+
+.incomplete-profile-content .btn {
+  width: 100%;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.incomplete-profile-content .btn-primary {
+  background: #667eea;
+  color: white;
+}
+
+.incomplete-profile-content .btn-primary:hover {
+  background: #5568d3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.incomplete-profile-content .btn-primary:active {
+  transform: translateY(0);
+}
+

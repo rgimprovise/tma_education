@@ -100,6 +100,11 @@ export function DashboardPage() {
 
   const userName = user?.firstName || 'Участник';
 
+  // Проверяем, есть ли у пользователя хотя бы один открытый или завершённый модуль
+  const hasAccessibleModules = modules.some(
+    (m) => m.enrollment.status === 'IN_PROGRESS' || m.enrollment.status === 'COMPLETED'
+  );
+
   return (
     <div className="container">
       <div className="page-header">
@@ -107,42 +112,60 @@ export function DashboardPage() {
         <p className="page-subtitle">Ваш прогресс по модулям</p>
       </div>
 
-      <div className="modules-list">
-        {modules.map((module) => (
-          <div
-            key={module.id}
-            className={`card ${module.enrollment.status === 'LOCKED' ? 'card-disabled' : ''}`}
-            onClick={() => {
-              if (module.enrollment.status !== 'LOCKED') {
-                navigate(`/modules/${module.id}`);
-              }
-            }}
-          >
-            <div className="card-title">
-              Модуль {module.index}: {module.title}
-            </div>
-            {module.description && (
-              <div className="card-subtitle">{module.description}</div>
-            )}
-            <div className={`card-status ${getStatusClass(module.enrollment.status)}`}>
-              {getStatusLabel(module.enrollment.status)}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {currentModule && currentModule.enrollment.status === 'IN_PROGRESS' && (
-        <button className="btn btn-primary" onClick={handleContinue}>
-          ▶️ Продолжить обучение
-        </button>
-      )}
-
-      {!currentModule && (
-        <div className="text-center mt-16">
-          <p className="page-subtitle">
-            Ждите открытия модуля куратором
+      {!hasAccessibleModules ? (
+        // Заглушка, если нет доступных модулей
+        <div className="empty-state">
+          <div className="empty-state-icon">🔒</div>
+          <h2 className="empty-state-title">Модули пока не открыты</h2>
+          <p className="empty-state-description">
+            Пока для вас не открыт ни один модуль.
+            <br />
+            Куратор откроет первый модуль, когда начнётся обучение.
           </p>
+          <div className="empty-state-hint">
+            <p>Вы получите уведомление в Telegram, когда модуль будет открыт.</p>
+          </div>
         </div>
+      ) : (
+        <>
+          <div className="modules-list">
+            {modules.map((module) => (
+              <div
+                key={module.id}
+                className={`card ${module.enrollment.status === 'LOCKED' ? 'card-disabled' : ''}`}
+                onClick={() => {
+                  if (module.enrollment.status !== 'LOCKED') {
+                    navigate(`/modules/${module.id}`);
+                  }
+                }}
+              >
+                <div className="card-title">
+                  Модуль {module.index}: {module.title}
+                </div>
+                {module.description && (
+                  <div className="card-subtitle">{module.description}</div>
+                )}
+                <div className={`card-status ${getStatusClass(module.enrollment.status)}`}>
+                  {getStatusLabel(module.enrollment.status)}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {currentModule && currentModule.enrollment.status === 'IN_PROGRESS' && (
+            <button className="btn btn-primary" onClick={handleContinue}>
+              ▶️ Продолжить обучение
+            </button>
+          )}
+
+          {!currentModule && (
+            <div className="text-center mt-16">
+              <p className="page-subtitle">
+                Ждите открытия модуля куратором
+              </p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

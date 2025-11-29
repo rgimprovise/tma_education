@@ -7,6 +7,7 @@ interface User {
   firstName?: string;
   lastName?: string;
   role: 'LEARNER' | 'CURATOR' | 'ADMIN';
+  profileCompleted?: boolean;
 }
 
 interface AuthContextType {

@@ -7,6 +7,7 @@ import { ModulePage } from './pages/ModulePage';
 import { StepPage } from './pages/StepPage';
 import { SubmissionsPage } from './pages/SubmissionsPage';
 import { LoginPage } from './pages/LoginPage';
+import { IncompleteProfilePage } from './pages/IncompleteProfilePage';
 import { CuratorDashboardPage } from './pages/CuratorDashboardPage';
 import { CuratorUserPage } from './pages/CuratorUserPage';
 import { CourseBuilderPage } from './pages/CourseBuilderPage';
@@ -48,7 +49,10 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          {/* Главная страница - редирект на login для автоавторизации */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/incomplete-profile" element={<IncompleteProfilePage />} />
           
           {/* Роуты для обучающихся */}
           <Route
@@ -151,8 +155,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-          
-          <Route path="/" element={<Navigate to="/login" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
