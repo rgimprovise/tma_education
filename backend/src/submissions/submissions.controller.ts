@@ -62,6 +62,18 @@ export class SubmissionsController {
   }
 
   /**
+   * POST /submissions/:id/request-resubmission
+   * Запросить повторную отправку ответа (только для владельца submission)
+   */
+  @Post(':id/request-resubmission')
+  async requestResubmission(
+    @Param('id') id: string,
+    @Request() req,
+  ): Promise<{ message: string; submission: SubmissionResponseDto }> {
+    return this.submissionsService.requestResubmission(id, req.user.id);
+  }
+
+  /**
    * GET /submissions/:id
    * Детальная информация о сдаче
    */

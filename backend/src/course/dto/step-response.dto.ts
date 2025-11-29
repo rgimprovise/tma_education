@@ -37,6 +37,8 @@ export class StepWithProgressDto extends StepResponseDto {
     aiFeedback?: string;
     curatorScore?: number;
     curatorFeedback?: string;
+    resubmissionRequested: boolean;
+    resubmissionRequestedAt?: Date;
     createdAt: Date;
   };
 }

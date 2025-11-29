@@ -14,6 +14,8 @@ export class SubmissionResponseDto {
   curatorScore?: number;
   curatorFeedback?: string;
   status: 'SENT' | 'AI_REVIEWED' | 'CURATOR_APPROVED' | 'CURATOR_RETURNED';
+  resubmissionRequested: boolean;
+  resubmissionRequestedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
   step?: {

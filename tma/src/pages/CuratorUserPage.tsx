@@ -39,6 +39,8 @@ interface Submission {
   aiFeedback?: string;
   curatorScore?: number;
   curatorFeedback?: string;
+  resubmissionRequested: boolean;
+  resubmissionRequestedAt?: string;
   createdAt: string;
 }
 
@@ -254,6 +256,11 @@ export function CuratorUserPage() {
               <div className="card-subtitle">
                 Статус: {submission.status}
               </div>
+              {submission.resubmissionRequested && (
+                <div className="resubmission-request-badge">
+                  🔄 Запрос на повторную отправку
+                </div>
+              )}
               {submission.aiScore !== null && submission.aiScore !== undefined && (
                 <div className="submission-score">
                   Оценка ИИ: {submission.aiScore}/10

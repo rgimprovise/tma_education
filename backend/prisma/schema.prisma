@@ -147,6 +147,9 @@ model Submission {
 
   status SubmissionStatus @default(SENT) // SENT, AI_REVIEWED, CURATOR_APPROVED, CURATOR_RETURNED
 
+  resubmissionRequested   Boolean   @default(false) // Ученик запросил повторную отправку
+  resubmissionRequestedAt DateTime? // Когда запрошена повторная отправка
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

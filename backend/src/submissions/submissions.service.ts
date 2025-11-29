@@ -441,6 +441,96 @@ export class SubmissionsService {
   }
 
   /**
+   * Запросить повторную отправку ответа
+   * Только владелец submission может запросить повторную отправку
+   * 
+   * @param submissionId ID сдачи
+   * @param userId ID текущего пользователя
+   * @returns Обновленная сдача с сообщением
+   */
+  async requestResubmission(
+    submissionId: string,
+    userId: string,
+  ): Promise<{ message: string; submission: any }> {
+    // 1. Найти submission
+    const submission = await this.prisma.submission.findUnique({
+      where: { id: submissionId },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true } },
+        step: { select: { id: true, title: true, index: true } },
+        module: { select: { id: true, title: true, index: true } },
+      },
+    });
+
+    if (!submission) {
+      throw new NotFoundException('Submission not found');
+    }
+
+    // 2. Проверить, что пользователь - владелец
+    if (submission.userId !== userId) {
+      throw new ForbiddenException('You can only request resubmission for your own submissions');
+    }
+
+    // 3. Проверить статус (не разрешаем для CURATOR_APPROVED)
+    if (submission.status === 'CURATOR_APPROVED') {
+      throw new BadRequestException('Cannot request resubmission for approved submissions');
+    }
+
+    // 4. Проверить, что запрос еще не был сделан
+    if (submission.resubmissionRequested) {
+      throw new BadRequestException('Запрос на повторную отправку уже отправлен. Дождитесь ответа куратора.');
+    }
+
+    // 5. Обновить submission
+    const updatedSubmission = await this.prisma.submission.update({
+      where: { id: submissionId },
+      data: {
+        resubmissionRequested: true,
+        resubmissionRequestedAt: new Date(),
+      },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true } },
+        step: { select: { id: true, title: true, index: true } },
+        module: { select: { id: true, title: true, index: true } },
+      },
+    });
+
+    // 6. Отправить уведомление кураторам (опционально, асинхронно)
+    const userName = `${submission.user.firstName || ''} ${submission.user.lastName || ''}`.trim() || 'Ученик';
+    const notificationText = 
+      `🔄 Запрос на повторную отправку\n\n` +
+      `Ученик: ${userName}\n` +
+      `Модуль ${submission.module.index}: ${submission.module.title}\n` +
+      `Шаг ${submission.step.index}: ${submission.step.title}\n\n` +
+      `Ученик просит разрешить повторную отправку ответа.`;
+
+    // Получаем всех кураторов для уведомления
+    const curators = await this.prisma.user.findMany({
+      where: {
+        role: { in: ['CURATOR', 'ADMIN'] },
+        telegramId: { not: null },
+      },
+      select: { telegramId: true },
+    });
+
+    // Отправляем уведомления асинхронно (не блокируем ответ)
+    curators.forEach((curator) => {
+      if (curator.telegramId) {
+        this.telegramService
+          .sendMessage(curator.telegramId, notificationText)
+          .catch((error) => {
+            console.error('Failed to notify curator about resubmission request:', error);
+          });
+      }
+    });
+
+    return {
+      message: 'Запрос на повторную отправку отправлен куратору',
+      submission: updatedSubmission,
+    };
+  }
+
+  /**
    * Проверяет, завершён ли модуль, и обновляет статус Enrollment
    * Модуль считается завершённым, если все обязательные шаги имеют
    * Submission со статусом CURATOR_APPROVED

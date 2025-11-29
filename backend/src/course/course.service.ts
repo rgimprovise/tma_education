@@ -286,6 +286,8 @@ export class CourseService {
               aiFeedback: submission.aiFeedback || undefined,
               curatorScore: submission.curatorScore || undefined,
               curatorFeedback: submission.curatorFeedback || undefined,
+              resubmissionRequested: submission.resubmissionRequested,
+              resubmissionRequestedAt: submission.resubmissionRequestedAt || undefined,
               createdAt: submission.createdAt,
             }
           : undefined,
@@ -357,6 +359,8 @@ export class CourseService {
             aiFeedback: submission.aiFeedback || undefined,
             curatorScore: submission.curatorScore || undefined,
             curatorFeedback: submission.curatorFeedback || undefined,
+            resubmissionRequested: submission.resubmissionRequested,
+            resubmissionRequestedAt: submission.resubmissionRequestedAt || undefined,
             createdAt: submission.createdAt,
           }
         : undefined,

@@ -36,6 +36,8 @@ interface Step {
     aiFeedback?: string;
     curatorScore?: number;
     curatorFeedback?: string;
+    resubmissionRequested: boolean;
+    resubmissionRequestedAt?: string;
   };
 }
 
@@ -48,6 +50,7 @@ export function StepPage() {
   const [formAnswers, setFormAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [requestingResubmission, setRequestingResubmission] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isLearner = user?.role === 'LEARNER';
@@ -86,6 +89,35 @@ export function StepPage() {
 
     loadStep();
   }, [stepId]);
+
+  const handleRequestResubmission = async () => {
+    if (!step || !step.submission) return;
+
+    try {
+      setRequestingResubmission(true);
+      setError(null);
+
+      await api.post(`/submissions/${step.submission.id}/request-resubmission`);
+
+      // Обновляем step локально (перезагружаем данные)
+      const response = await api.get(`/course/steps/${stepId}`);
+      setStep(response.data);
+
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert('✅ Запрос на повторную отправку отправлен куратору. Дождитесь его решения.');
+      }
+    } catch (err: any) {
+      console.error('Request resubmission error:', err);
+      const errorMessage = err.response?.data?.message || 'Ошибка при запросе повторной отправки';
+      setError(errorMessage);
+      
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`❌ ${errorMessage}`);
+      }
+    } finally {
+      setRequestingResubmission(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!step) return;
@@ -351,6 +383,27 @@ export function StepPage() {
                step.submission.status !== 'CURATOR_RETURNED' && (
                 <div className="info-hint">
                   ℹ️ Ваш ответ проверяется куратором. Результат появится здесь после проверки.
+                </div>
+              )}
+
+              {/* Для LEARNER: кнопка запроса повторной отправки */}
+              {isLearner && 
+               step.submission.status !== 'CURATOR_APPROVED' && 
+               !step.submission.resubmissionRequested && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleRequestResubmission}
+                  disabled={requestingResubmission}
+                  style={{ marginTop: '12px' }}
+                >
+                  {requestingResubmission ? 'Отправка запроса...' : '🔄 Запросить повторную отправку'}
+                </button>
+              )}
+
+              {/* Для LEARNER: бейдж если запрос уже отправлен */}
+              {isLearner && step.submission.resubmissionRequested && (
+                <div className="resubmission-badge">
+                  🔄 Запрос на повторную отправку отправлен куратору. Ожидайте решения.
                 </div>
               )}
             </div>
