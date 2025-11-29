@@ -35,14 +35,17 @@ cd /var/www/tma_education
 # 1. Получить последние изменения
 git pull
 
-# 2. Пересобрать backend
+# 2. Обновить Prisma Client (сгенерировать типы для Course)
 cd backend
+npx prisma generate
+
+# 3. Пересобрать backend
 npm run build
 
-# 3. Перезапустить backend
+# 4. Перезапустить backend
 pm2 restart minto-backend
 
-# 4. Проверить логи
+# 5. Проверить логи
 pm2 logs minto-backend --lines 20
 ```
 
@@ -153,14 +156,23 @@ export class CourseModule {}
 2. ✅ Применили миграцию (`prisma migrate deploy`)
 3. ✅ Обновили seed script
 4. ✅ Создали новые файлы контроллера и сервиса
-5. ❌ **НЕ пересобрали backend** (`npm run build`)
-6. ✅ Пересобрали TMA (`npm run build`)
+5. ❌ **НЕ обновили Prisma Client** (`npx prisma generate`)
+6. ❌ **НЕ пересобрали backend** (`npm run build`)
+7. ✅ Пересобрали TMA (`npm run build`)
 
-В результате TMA запрашивает `/admin/courses`, но backend не знает об этом endpoint, потому что TypeScript файлы не были скомпилированы в JavaScript.
+### Что не так:
+
+**Проблема 1: Prisma Client не обновлён**
+После применения миграции нужно запустить `npx prisma generate` чтобы обновить Prisma Client с типами для новой модели `Course`. Без этого TypeScript не знает о существовании `prisma.course.*` методов.
+
+**Проблема 2: Backend не пересобран**
+Даже если бы Prisma Client был обновлён, TMA запрашивает `/admin/courses`, но backend не знает об этом endpoint, потому что TypeScript файлы не были скомпилированы в JavaScript.
 
 ## Профилактика
 
-В будущем, при добавлении новых контроллеров/сервисов в backend, **всегда** выполняйте:
+В будущем:
+
+### При добавлении новых контроллеров/сервисов в backend:
 
 ```bash
 cd backend
@@ -168,7 +180,17 @@ npm run build
 pm2 restart minto-backend
 ```
 
-Или используйте автоматический скрипт развёртывания, который включает этот шаг.
+### При изменении schema.prisma (добавление моделей/полей):
+
+```bash
+cd backend
+npx prisma migrate deploy  # Применить миграции
+npx prisma generate        # Обновить Prisma Client с новыми типами
+npm run build              # Пересобрать backend
+pm2 restart minto-backend  # Перезапустить
+```
+
+Или используйте автоматические скрипты развёртывания, которые включают эти шаги.
 
 ---
 

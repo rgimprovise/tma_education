@@ -13,18 +13,23 @@ echo ""
 echo "📥 Получение обновлений..."
 git pull
 
-# 2. Пересобрать backend
+# 2. Обновить Prisma Client (сгенерировать типы для новой модели Course)
+echo ""
+echo "🔄 Обновление Prisma Client..."
+cd backend
+npx prisma generate
+
+# 3. Пересобрать backend
 echo ""
 echo "🔨 Сборка backend..."
-cd backend
 npm run build
 
-# 3. Перезапустить backend
+# 4. Перезапустить backend
 echo ""
 echo "🔄 Перезапуск backend..."
 pm2 restart minto-backend
 
-# 4. Проверить логи
+# 5. Проверить логи
 echo ""
 echo "📋 Последние логи backend:"
 pm2 logs minto-backend --lines 20 --nostream
