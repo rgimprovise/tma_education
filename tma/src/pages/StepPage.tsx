@@ -287,7 +287,9 @@ export function StepPage() {
           'иначе он не сможет связать его с заданием.',
           () => {
             // После закрытия alert - закрываем Mini App, чтобы пользователь вернулся в чат
-            window.Telegram.WebApp.close();
+            if (window.Telegram?.WebApp) {
+              window.Telegram.WebApp.close();
+            }
           }
         );
       } else {
