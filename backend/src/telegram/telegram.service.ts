@@ -67,51 +67,55 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     try {
       this.setupHandlers();
       
-      // Запускаем бота через polling в фоновом режиме
-      this.logger.log('Telegram Bot initialization started...');
+      const useWebhook = this.configService.get<string>('TELEGRAM_USE_WEBHOOK') === 'true';
       
-      // Добавляем timeout для диагностики зависаний
-      const startTimeout = setTimeout(() => {
-        if (!this.isRunning) {
-          this.logger.error('⚠️ Telegram Bot start timeout (30s). Possible causes:');
-          this.logger.error('  - Another process is using this bot token (long polling conflict)');
-          this.logger.error('  - Network connectivity issues');
-          this.logger.error('  - Firewall blocking Telegram API');
-          this.logger.error('Consider using webhook instead of polling for production.');
-        }
-      }, 30000);
-      
-      this.bot.start()
-        .then(() => {
-          clearTimeout(startTimeout);
-          this.isRunning = true;
-          this.logger.log('✅ Bot polling started successfully');
-          
-          return this.bot.api.getMe();
-        })
-        .then((botInfo) => {
-          this.logger.log(`🤖 Telegram Bot started: @${botInfo.username}`);
-          this.logger.log(`Bot ID: ${botInfo.id}`);
-          this.logger.log(`Can read all messages: ${botInfo.can_read_all_group_messages}`);
-        })
-        .catch((error) => {
-          clearTimeout(startTimeout);
-          this.logger.error('❌ Failed to start Telegram Bot:');
-          this.logger.error(`Error type: ${error.constructor.name}`);
-          this.logger.error(`Error message: ${error.message}`);
-          if (error.stack) {
-            this.logger.error(`Stack: ${error.stack.split('\n').slice(0, 3).join('\n')}`);
+      if (useWebhook) {
+        // Webhook режим - не запускаем polling
+        this.isRunning = true;
+        const botInfo = await this.bot.api.getMe();
+        this.logger.log(`🤖 Telegram Bot initialized (webhook mode): @${botInfo.username}`);
+        this.logger.log(`⚠️ Don't forget to set webhook URL via /telegram/set-webhook`);
+      } else {
+        // Polling режим (для разработки)
+        this.logger.log('Telegram Bot initialization started (polling mode)...');
+        
+        // Добавляем timeout для диагностики зависаний
+        const startTimeout = setTimeout(() => {
+          if (!this.isRunning) {
+            this.logger.error('⚠️ Telegram Bot start timeout (30s). Possible causes:');
+            this.logger.error('  - Another process is using this bot token (long polling conflict)');
+            this.logger.error('  - Network connectivity issues');
+            this.logger.error('  - Firewall blocking Telegram API');
+            this.logger.error('Consider setting TELEGRAM_USE_WEBHOOK=true in .env');
           }
-          
-          // Проверяем распространенные проблемы
-          if (error.message?.includes('409')) {
-            this.logger.error('🔴 CONFLICT: Another instance is using this bot token!');
-            this.logger.error('   Solution: Stop other bot instances or use webhook mode');
-          } else if (error.message?.includes('401')) {
-            this.logger.error('🔴 UNAUTHORIZED: Bot token is invalid');
-            this.logger.error('   Solution: Check TELEGRAM_BOT_TOKEN in .env');
-          }
-        });
+        }, 30000);
+        
+        this.bot.start()
+          .then(() => {
+            clearTimeout(startTimeout);
+            this.isRunning = true;
+            this.logger.log('✅ Bot polling started successfully');
+            
+            return this.bot.api.getMe();
+          })
+          .then((botInfo) => {
+            this.logger.log(`🤖 Telegram Bot started: @${botInfo.username}`);
+            this.logger.log(`Bot ID: ${botInfo.id}`);
+          })
+          .catch((error) => {
+            clearTimeout(startTimeout);
+            this.logger.error('❌ Failed to start Telegram Bot:');
+            this.logger.error(`Error type: ${error.constructor.name}`);
+            this.logger.error(`Error message: ${error.message}`);
+            
+            if (error.message?.includes('409')) {
+              this.logger.error('🔴 CONFLICT: Another instance is using this bot token!');
+              this.logger.error('   Solution: Set TELEGRAM_USE_WEBHOOK=true in .env');
+            } else if (error.message?.includes('401')) {
+              this.logger.error('🔴 UNAUTHORIZED: Bot token is invalid');
+            }
+          });
+      }
     } catch (error) {
       this.logger.error('Error initializing Telegram Bot:', error);
     }
@@ -632,6 +636,95 @@ ${submission.curatorFeedback || 'Требуется доработка'}
       },
     });
   }
+
+  /**
+   * Обработать update от Telegram (для webhook режима)
+   * @param update - Update объект от Telegram API
+   */
+  async handleUpdate(update: any): Promise<void> {
+    if (!this.bot) {
+      this.logger.warn('Bot not initialized. Cannot handle update.');
+      return;
+    }
+
+    try {
+      await this.bot.handleUpdate(update);
+    } catch (error: any) {
+      this.logger.error('Error handling Telegram update:', error);
+    }
+  }
+
+  /**
+   * Установить webhook URL в Telegram
+   * @param url - URL для webhook (опционально, берётся из env)
+   */
+  async setWebhook(url?: string): Promise<any> {
+    if (!this.bot || !this.isRunning) {
+      // В webhook режиме isRunning = true сразу, так что это ок
+    }
+
+    const webhookUrl = url || this.configService.get<string>('TELEGRAM_WEBHOOK_URL');
+    
+    if (!webhookUrl) {
+      throw new Error('TELEGRAM_WEBHOOK_URL not set in .env');
+    }
+
+    try {
+      const result = await this.bot.api.setWebhook(webhookUrl);
+      this.logger.log(`✅ Webhook set to: ${webhookUrl}`);
+      return {
+        ok: true,
+        message: 'Webhook set successfully',
+        url: webhookUrl,
+        result,
+      };
+    } catch (error: any) {
+      this.logger.error('Failed to set webhook:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Получить информацию о текущем webhook
+   */
+  async getWebhookInfo(): Promise<any> {
+    if (!this.bot) {
+      throw new Error('Bot not initialized');
+    }
+
+    try {
+      const info = await this.bot.api.getWebhookInfo();
+      return {
+        ok: true,
+        info,
+      };
+    } catch (error: any) {
+      this.logger.error('Failed to get webhook info:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Удалить webhook (переключиться обратно на polling)
+   */
+  async deleteWebhook(): Promise<any> {
+    if (!this.bot) {
+      throw new Error('Bot not initialized');
+    }
+
+    try {
+      await this.bot.api.deleteWebhook({ drop_pending_updates: true });
+      this.logger.log('✅ Webhook deleted. Bot can use polling now.');
+      return {
+        ok: true,
+        message: 'Webhook deleted successfully',
+      };
+    } catch (error: any) {
+      this.logger.error('Failed to delete webhook:', error);
+      throw error;
+    }
+  }
 }
+
 
 
