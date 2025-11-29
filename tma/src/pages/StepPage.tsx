@@ -51,6 +51,7 @@ export function StepPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [requestingResubmission, setRequestingResubmission] = useState(false);
+  const [startingAudioSubmission, setStartingAudioSubmission] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isLearner = user?.role === 'LEARNER';
@@ -264,6 +265,62 @@ export function StepPage() {
     navigate(`/modules/${step.module.id}`);
   };
 
+  const handleStartAudioSubmission = async () => {
+    if (!step) return;
+
+    try {
+      setStartingAudioSubmission(true);
+      setError(null);
+
+      await api.post('/audio-submissions/start', {
+        stepId: step.id,
+        moduleId: step.module.id,
+      });
+
+      // Показываем успешное сообщение с инструкцией
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(
+          '✅ Инструкция отправлена!\n\n' +
+          'Перейдите в диалог с ботом и отправьте голосовое сообщение ' +
+          '**ответом (реплаем)** на инструкцию бота.\n\n' +
+          '⚠️ Важно: отправьте аудио именно ответом на сообщение бота, ' +
+          'иначе он не сможет связать его с заданием.'
+        );
+      } else {
+        alert(
+          'Инструкция отправлена в диалог с ботом. ' +
+          'Перейдите туда и отправьте голосовое сообщение ответом на инструкцию.'
+        );
+      }
+
+      // Обновляем данные о шаге, чтобы отобразить submission
+      const response = await api.get(`/course/steps/${step.id}`);
+      setStep(response.data);
+    } catch (err: any) {
+      console.error('Audio submission start error:', err);
+      
+      let errorMessage = 'Неизвестная ошибка';
+      
+      if (err.response?.data?.message) {
+        errorMessage = Array.isArray(err.response.data.message)
+          ? err.response.data.message.join('; ')
+          : err.response.data.message;
+      } else if (err.response?.status === 403) {
+        errorMessage = 'Модуль ещё не открыт куратором.';
+      } else if (err.response?.status === 400) {
+        errorMessage = err.response.data?.message || 'Некорректный запрос.';
+      }
+      
+      setError(errorMessage);
+      
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`❌ Ошибка:\n\n${errorMessage}`);
+      }
+    } finally {
+      setStartingAudioSubmission(false);
+    }
+  };
+
   return (
     <div className="container">
       <button className="btn-back" onClick={handleBackToModule}>
@@ -410,20 +467,38 @@ export function StepPage() {
           )}
 
           {(!hasSubmission || isReturned) && (
-            <button
-              className="btn btn-primary"
-              onClick={handleSubmit}
-              disabled={
-                submitting ||
-                (step.formSchema && step.formSchema.fields && step.formSchema.fields.length > 0
-                  ? step.formSchema.fields
-                      .filter((f) => f.required)
-                      .some((f) => !formAnswers[f.id]?.trim())
-                  : !answer.trim())
-              }
-            >
-              {submitting ? 'Отправка...' : 'Отправить на проверку'}
-            </button>
+            <>
+              <button
+                className="btn btn-primary"
+                onClick={handleSubmit}
+                disabled={
+                  submitting ||
+                  (step.formSchema && step.formSchema.fields && step.formSchema.fields.length > 0
+                    ? step.formSchema.fields
+                        .filter((f) => f.required)
+                        .some((f) => !formAnswers[f.id]?.trim())
+                    : !answer.trim())
+                }
+              >
+                {submitting ? 'Отправка...' : 'Отправить на проверку'}
+              </button>
+
+              {/* Кнопка для аудио/видео сдачи */}
+              {(step.expectedAnswer === 'AUDIO' || step.expectedAnswer === 'VIDEO') && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleStartAudioSubmission}
+                  disabled={startingAudioSubmission}
+                  style={{ marginTop: '8px' }}
+                >
+                  {startingAudioSubmission 
+                    ? 'Отправка инструкции...' 
+                    : step.expectedAnswer === 'AUDIO' 
+                      ? '🎤 Сдать голосовым сообщением' 
+                      : '📹 Сдать видео-сообщением'}
+                </button>
+              )}
+            </>
           )}
         </div>
       ) : (

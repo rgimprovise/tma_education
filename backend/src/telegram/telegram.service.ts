@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ModuleRef } from '@nestjs/core';
 import { Bot, Context } from 'grammy';
 import { UsersService } from '../users/users.service';
 import { isCurator } from '../users/curators.config';
@@ -43,6 +44,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private configService: ConfigService,
     private usersService: UsersService,
+    private moduleRef: ModuleRef,
   ) {
     const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
     this.tmaUrl = this.configService.get<string>('TMA_URL', 'http://localhost:5173');
@@ -127,6 +129,26 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       } catch (error) {
         this.logger.error('Error handling text message:', error);
         await ctx.reply('❌ Произошла ошибка. Попробуйте снова или отправьте /start.');
+      }
+    });
+
+    // Обработка голосовых сообщений (для аудио-сдачи заданий)
+    this.bot.on('message:voice', async (ctx: Context) => {
+      try {
+        await this.handleVoiceMessage(ctx, 'voice');
+      } catch (error) {
+        this.logger.error('Error handling voice message:', error);
+        await ctx.reply('❌ Произошла ошибка при обработке голосового сообщения.');
+      }
+    });
+
+    // Обработка видео-заметок (для аудио-сдачи заданий)
+    this.bot.on('message:video_note', async (ctx: Context) => {
+      try {
+        await this.handleVoiceMessage(ctx, 'video_note');
+      } catch (error) {
+        this.logger.error('Error handling video note:', error);
+        await ctx.reply('❌ Произошла ошибка при обработке видео-сообщения.');
       }
     });
 
@@ -472,5 +494,112 @@ ${submission.curatorFeedback || 'Требуется доработка'}
       },
     });
   }
+
+  /**
+   * Обработка голосовых сообщений и видео-заметок (для аудио-сдачи)
+   * @param ctx - Контекст сообщения grammY
+   * @param messageType - Тип сообщения ('voice' или 'video_note')
+   */
+  private async handleVoiceMessage(ctx: Context, messageType: 'voice' | 'video_note') {
+    const telegramId = ctx.from?.id.toString();
+    if (!telegramId) return;
+
+    // Проверяем, что это reply на сообщение
+    const replyToMessageId = ctx.message?.reply_to_message?.message_id;
+    if (!replyToMessageId) {
+      await ctx.reply(
+        '⚠️ Чтобы сдать аудио-задание, отправьте голосовое сообщение **ответом (реплаем)** на инструкцию бота.',
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+
+    // Получаем file_id
+    const fileId = messageType === 'voice' 
+      ? ctx.message?.voice?.file_id 
+      : ctx.message?.video_note?.file_id;
+    
+    if (!fileId) {
+      await ctx.reply('❌ Не удалось получить аудио-файл.');
+      return;
+    }
+
+    this.logger.log(`Received ${messageType} from ${telegramId}, reply_to: ${replyToMessageId}, file_id: ${fileId}`);
+
+    // Отправляем подтверждение получения
+    await ctx.reply('⏳ Обрабатываю ваше аудио-сообщение. Пожалуйста, подождите...');
+
+    // Вызываем AudioSubmissionsService для обработки
+    try {
+      // Ленивая инжекция через ModuleRef для избежания циклической зависимости
+      const { AudioSubmissionsService } = await import('../submissions/audio-submissions.service');
+      const audioSubmissionsService = this.moduleRef.get(AudioSubmissionsService, { strict: false });
+      
+      // Запускаем обработку в фоне (не блокируем обработчик)
+      audioSubmissionsService.processVoiceSubmission(telegramId, replyToMessageId, fileId)
+        .catch((error: Error) => {
+          this.logger.error(`Error in background voice processing: ${error.message}`);
+        });
+    } catch (error: any) {
+      this.logger.error(`Failed to get AudioSubmissionsService: ${error.message}`);
+      await ctx.reply('❌ Произошла ошибка. Попробуйте позже.');
+    }
+  }
+
+  /**
+   * Получить URL для скачивания файла из Telegram
+   * @param fileId - file_id из Telegram
+   * @returns URL для скачивания
+   */
+  async getFileUrl(fileId: string): Promise<string> {
+    if (!this.bot || !this.isRunning) {
+      throw new Error('Bot is not running');
+    }
+
+    try {
+      const file = await this.bot.api.getFile(fileId);
+      const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
+      return `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+    } catch (error: any) {
+      this.logger.error(`Failed to get file URL for ${fileId}:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Отправить уведомление о запросе повторной сдачи
+   * @param curatorTelegramId - Telegram ID куратора
+   * @param submission - Данные о сдаче
+   */
+  async notifyResubmissionRequested(
+    curatorTelegramId: string,
+    submission: any,
+  ): Promise<void> {
+    const userName = `${submission.user?.firstName || ''} ${submission.user?.lastName || ''}`.trim() || 'Участник';
+    const moduleTitle = submission.module?.title || `Модуль ${submission.module?.index || '?'}`;
+    const stepTitle = submission.step?.title || `Шаг ${submission.step?.index || '?'}`;
+
+    const message = `🔄 Запрос на повторную сдачу
+
+👤 Участник: ${userName}
+📚 Модуль: ${moduleTitle}
+📝 Задание: ${stepTitle}
+
+Участник просит возможность отправить задание повторно.`;
+
+    await this.sendMessage(curatorTelegramId, message, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: '👁️ Посмотреть в TMA',
+              web_app: { url: this.tmaUrl },
+            },
+          ],
+        ],
+      },
+    });
+  }
 }
+
 

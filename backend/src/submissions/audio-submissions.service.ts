@@ -3,15 +3,20 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { AiService } from '../ai/ai.service';
 
 @Injectable()
 export class AudioSubmissionsService {
+  private readonly logger = new Logger(AudioSubmissionsService.name);
+
   constructor(
     private prisma: PrismaService,
     private telegramService: TelegramService,
+    private aiService: AiService,
   ) {}
 
   /**
@@ -152,6 +157,175 @@ export class AudioSubmissionsService {
       // Submission уже отправлен и ещё не проверен
       throw new BadRequestException(
         'You have already submitted this step. Please wait for curator review or request resubmission.',
+      );
+    }
+  }
+
+  /**
+   * Обработать голосовое/видео сообщение от пользователя
+   * 1. Найти Submission по reply_to_message_id
+   * 2. Скачать файл из Telegram
+   * 3. Транскрибировать через Whisper
+   * 4. Оценить через AI
+   * 5. Обновить Submission
+   * 6. Уведомить куратора и ученика
+   */
+  async processVoiceSubmission(
+    telegramId: string,
+    replyToMessageId: number,
+    fileId: string,
+  ): Promise<void> {
+    try {
+      // 1. Найти пользователя
+      const user = await this.prisma.user.findUnique({
+        where: { telegramId },
+        select: { id: true, telegramId: true, firstName: true, lastName: true },
+      });
+
+      if (!user) {
+        await this.telegramService.sendMessage(
+          telegramId,
+          '❌ Пользователь не найден в системе. Отправьте /start для регистрации.',
+        );
+        return;
+      }
+
+      // 2. Найти Submission по telegramPromptMessageId
+      const submission = await this.prisma.submission.findFirst({
+        where: {
+          userId: user.id,
+          telegramPromptMessageId: replyToMessageId,
+        },
+        include: {
+          step: {
+            select: {
+              id: true,
+              title: true,
+              content: true,
+              maxScore: true,
+              aiRubric: true,
+              requiresAiReview: true,
+            },
+          },
+          module: {
+            select: {
+              id: true,
+              index: true,
+              title: true,
+            },
+          },
+        },
+      });
+
+      if (!submission) {
+        await this.telegramService.sendMessage(
+          telegramId,
+          '❌ Не удалось найти задание, к которому вы отправили аудио. Попробуйте начать заново из учебного приложения.',
+        );
+        return;
+      }
+
+      this.logger.log(`Processing voice submission ${submission.id} for user ${user.id}`);
+
+      // 3. Скачать файл из Telegram
+      const fileUrl = await this.telegramService.getFileUrl(fileId);
+      const response = await fetch(fileUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.statusText}`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = Buffer.from(arrayBuffer);
+
+      // Определяем расширение файла (ogg для голосовых, mp4 для видео-заметок)
+      const filename = submission.answerType === 'VIDEO' ? 'audio.mp4' : 'audio.ogg';
+
+      this.logger.log(`Downloaded audio file, size: ${audioBuffer.length} bytes`);
+
+      // 4. Транскрибировать через Whisper
+      const transcription = await this.aiService.transcribeAudio(audioBuffer, filename);
+      this.logger.log(`Transcription: ${transcription.substring(0, 100)}...`);
+
+      // 5. Оценить через AI (если требуется)
+      let aiScore: number | null = null;
+      let aiFeedback: string | null = null;
+
+      if (submission.step.requiresAiReview) {
+        const reviewResult = await this.aiService.reviewSubmission(
+          submission.step.content,
+          transcription,
+          submission.step.maxScore,
+          submission.step.aiRubric,
+        );
+        aiScore = reviewResult.score;
+        aiFeedback = reviewResult.feedback;
+        this.logger.log(`AI review completed: score ${aiScore}/${submission.step.maxScore}`);
+      }
+
+      // 6. Обновить Submission
+      const updatedSubmission = await this.prisma.submission.update({
+        where: { id: submission.id },
+        data: {
+          answerText: transcription,
+          answerFileId: fileId,
+          aiScore,
+          aiFeedback,
+          status: submission.step.requiresAiReview ? 'AI_REVIEWED' : 'SENT',
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              telegramId: true,
+            },
+          },
+          module: {
+            select: {
+              index: true,
+              title: true,
+            },
+          },
+          step: {
+            select: {
+              index: true,
+              title: true,
+            },
+          },
+        },
+      });
+
+      // 7. Уведомить ученика
+      const learnerMessage = submission.step.requiresAiReview
+        ? `✅ Аудио принято и обработано!\n\n📊 Предварительная оценка ИИ: ${aiScore}/${submission.step.maxScore}\n\n💬 Комментарий:\n${aiFeedback}\n\n⏳ Ваш ответ отправлен куратору на проверку.`
+        : `✅ Аудио принято!\n\n⏳ Ваш ответ отправлен куратору на проверку.`;
+
+      await this.telegramService.sendMessage(user.telegramId!, learnerMessage);
+
+      // 8. Найти кураторов и уведомить их
+      const curators = await this.prisma.user.findMany({
+        where: {
+          role: { in: ['CURATOR', 'ADMIN'] },
+          telegramId: { not: null },
+        },
+        select: { telegramId: true },
+      });
+
+      for (const curator of curators) {
+        if (curator.telegramId) {
+          await this.telegramService.notifyCuratorAboutSubmission(
+            curator.telegramId,
+            updatedSubmission,
+          );
+        }
+      }
+
+      this.logger.log(`Voice submission ${submission.id} processed successfully`);
+    } catch (error: any) {
+      this.logger.error('Error processing voice submission:', error);
+      await this.telegramService.sendMessage(
+        telegramId,
+        `❌ Произошла ошибка при обработке аудио: ${error.message}`,
       );
     }
   }
