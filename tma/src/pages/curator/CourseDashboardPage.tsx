@@ -13,11 +13,6 @@ interface CourseModule {
   updatedAt: string;
 }
 
-interface CourseStep {
-  id: string;
-  isRequired: boolean;
-}
-
 interface CourseStats {
   totalSteps: number;
   requiredSteps: number;
@@ -34,7 +29,6 @@ export function CourseDashboardPage() {
   const navigate = useNavigate();
   
   const [module, setModule] = useState<CourseModule | null>(null);
-  const [steps, setSteps] = useState<CourseStep[]>([]);
   const [stats, setStats] = useState<CourseStats>({
     totalSteps: 0,
     requiredSteps: 0,
@@ -65,7 +59,6 @@ export function CourseDashboardPage() {
       // Загружаем шаги модуля для подсчёта обязательных шагов
       const stepsResponse = await api.get(`/admin/course/modules/${moduleId}/steps`);
       const stepsData = stepsResponse.data;
-      setSteps(stepsData);
 
       // Загружаем статистику по модулю с backend
       const statsResponse = await api.get(`/admin/course/modules/${moduleId}/stats`);
@@ -74,7 +67,7 @@ export function CourseDashboardPage() {
       // Объединяем данные
       const stats: CourseStats = {
         totalSteps: stepsData.length,
-        requiredSteps: stepsData.filter((s: CourseStep) => s.isRequired).length,
+        requiredSteps: stepsData.filter((s: any) => s.isRequired).length,
         moduleId: backendStats.moduleId,
         totalLearners: backendStats.totalLearners,
         inProgressLearners: backendStats.inProgressLearners,
