@@ -20,11 +20,23 @@ export class StepResponseDto {
  * DTO для ответа с информацией о шаге и прогрессом пользователя
  */
 export class StepWithProgressDto extends StepResponseDto {
+  module: {
+    id: string;
+    title: string;
+    enrollment?: {
+      id: string;
+      status: 'IN_PROGRESS' | 'COMPLETED' | 'LOCKED';
+    };
+  };
+  
   submission?: {
     id: string;
     status: 'SENT' | 'AI_REVIEWED' | 'CURATOR_APPROVED' | 'CURATOR_RETURNED';
+    answerText?: string;
     aiScore?: number;
+    aiFeedback?: string;
     curatorScore?: number;
+    curatorFeedback?: string;
     createdAt: Date;
   };
 }

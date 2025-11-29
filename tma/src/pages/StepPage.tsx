@@ -22,6 +22,10 @@ interface Step {
   isRequired: boolean;
   module: {
     id: string;
+    enrollment?: {
+      id: string;
+      status: 'IN_PROGRESS' | 'COMPLETED' | 'LOCKED';
+    };
   };
   submission?: {
     id: string;
@@ -82,7 +86,29 @@ export function StepPage() {
   const handleSubmit = async () => {
     if (!step) return;
 
-    // Проверяем, есть ли динамическая форма
+    // 1. Проверяем статус модуля перед отправкой
+    if (!step.module.enrollment || step.module.enrollment.status !== 'IN_PROGRESS') {
+      const message = 'Модуль ещё не открыт куратором. Дождитесь открытия модуля для прохождения.';
+      setError(message);
+      
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`⚠️ ${message}`);
+      }
+      return;
+    }
+
+    // 2. Проверяем, не отправлен ли уже ответ
+    if (step.submission && step.submission.status !== 'CURATOR_RETURNED') {
+      const message = 'Вы уже отправили ответ на это задание. Дождитесь проверки куратора.';
+      setError(message);
+      
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`ℹ️ ${message}`);
+      }
+      return;
+    }
+
+    // 3. Проверяем, есть ли динамическая форма
     const hasFormSchema = step.formSchema && step.formSchema.fields && step.formSchema.fields.length > 0;
 
     if (hasFormSchema) {
@@ -91,7 +117,8 @@ export function StepPage() {
       const missingFields = requiredFields.filter((f) => !formAnswers[f.id]?.trim());
       
       if (missingFields.length > 0) {
-        setError(`Заполните обязательные поля: ${missingFields.map((f) => f.label).join(', ')}`);
+        const message = `Заполните обязательные поля: ${missingFields.map((f) => f.label).join(', ')}`;
+        setError(message);
         return;
       }
     } else {
@@ -111,6 +138,13 @@ export function StepPage() {
         ? JSON.stringify(formAnswers)
         : answer.trim();
 
+      console.log('Отправка submission:', {
+        stepId: step.id,
+        moduleId: step.module.id,
+        answerType: step.expectedAnswer,
+        hasText: !!answerText,
+      });
+
       await api.post('/submissions', {
         stepId: step.id,
         moduleId: step.module.id,
@@ -118,24 +152,46 @@ export function StepPage() {
         answerType: step.expectedAnswer || 'TEXT',
       });
 
-      // Показываем уведомление через Telegram WebApp
+      // Показываем уведомление об успехе
       if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert('✅ Ответ отправлен на проверку!');
+        window.Telegram.WebApp.showAlert('✅ Ответ отправлен на проверку!', () => {
+          navigate(-1);
+        });
       } else {
         alert('✅ Ответ отправлен на проверку!');
+        navigate(-1);
       }
-
-      // Возвращаемся к модулю
-      navigate(-1);
     } catch (err: any) {
       console.error('Submission error:', err);
-      const errorMessage = err.response?.data?.message || 'Ошибка при отправке ответа';
+      
+      // Формируем понятное сообщение об ошибке
+      let errorMessage = 'Неизвестная ошибка';
+      
+      if (err.response) {
+        if (err.response.data?.message) {
+          errorMessage = Array.isArray(err.response.data.message)
+            ? err.response.data.message.join('; ')
+            : err.response.data.message;
+        } else if (err.response.status === 400) {
+          errorMessage = 'Некорректные данные. Проверьте заполнение полей.';
+        } else if (err.response.status === 401) {
+          errorMessage = 'Ошибка авторизации. Перезайдите в приложение.';
+        } else if (err.response.status === 403) {
+          errorMessage = 'Модуль ещё не открыт куратором. Дождитесь открытия модуля.';
+        } else if (err.response.status === 404) {
+          errorMessage = 'Шаг или модуль не найден.';
+        } else if (err.response.status >= 500) {
+          errorMessage = 'Ошибка сервера. Попробуйте позже.';
+        }
+      } else if (err.request) {
+        errorMessage = 'Нет связи с сервером. Проверьте интернет-соединение.';
+      }
+      
       setError(errorMessage);
       
+      // Показываем ошибку только через Telegram WebApp alert (не через setError)
       if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert(`❌ ${errorMessage}`);
-      } else {
-        alert(`❌ ${errorMessage}`);
+        window.Telegram.WebApp.showAlert(`❌ Не удалось отправить ответ:\n\n${errorMessage}`);
       }
     } finally {
       setSubmitting(false);
