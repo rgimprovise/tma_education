@@ -29,6 +29,7 @@ export function CourseDashboardPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [unlockingModuleId, setUnlockingModuleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (courseId) {
@@ -60,6 +61,31 @@ export function CourseDashboardPage() {
   const handleCreateModule = () => {
     // Переход на создание нового модуля для этого курса
     navigate(`/curator/course/modules/new?courseId=${courseId}`);
+  };
+
+  const handleUnlockModule = async (moduleId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Не открывать карточку модуля
+
+    if (!confirm('Открыть этот модуль для всех зарегистрированных учеников?')) {
+      return;
+    }
+
+    try {
+      setUnlockingModuleId(moduleId);
+      const response = await api.post(`/admin/modules/${moduleId}/unlock`, {
+        forAll: true,
+      });
+
+      alert(response.data.message || `Модуль открыт для ${response.data.unlocked} учеников`);
+      
+      // Обновляем данные курса чтобы увидеть новое количество enrollments
+      await loadCourseData();
+    } catch (err: any) {
+      console.error('Failed to unlock module:', err);
+      alert(err.response?.data?.message || 'Ошибка при открытии модуля');
+    } finally {
+      setUnlockingModuleId(null);
+    }
   };
 
   const handleBackToCourses = () => {
@@ -142,37 +168,51 @@ export function CourseDashboardPage() {
               <div
                 key={module.id}
                 className="module-card"
-                onClick={() => handleModuleClick(module.id)}
               >
-                <div className="module-card-header">
-                  <h3 className="module-card-title">
-                    {module.isExam ? '🎓' : '📖'} {module.title}
-                  </h3>
-                  <span className="module-card-index">Модуль {module.index}</span>
+                <div 
+                  className="module-card-content"
+                  onClick={() => handleModuleClick(module.id)}
+                >
+                  <div className="module-card-header">
+                    <h3 className="module-card-title">
+                      {module.isExam ? '🎓' : '📖'} {module.title}
+                    </h3>
+                    <span className="module-card-index">Модуль {module.index}</span>
+                  </div>
+
+                  {module.description && (
+                    <p className="module-card-description">{module.description}</p>
+                  )}
+
+                  <div className="module-card-stats">
+                    <div className="stat-item">
+                      <span className="stat-icon">📝</span>
+                      <span className="stat-text">
+                        {module.stepsCount} {module.stepsCount === 1 ? 'шаг' : module.stepsCount < 5 ? 'шага' : 'шагов'}
+                      </span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-icon">👥</span>
+                      <span className="stat-text">
+                        {module.enrollmentsCount} {module.enrollmentsCount === 1 ? 'участник' : module.enrollmentsCount < 5 ? 'участника' : 'участников'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {module.isExam && (
+                    <div className="module-badge exam-badge">Экзамен</div>
+                  )}
                 </div>
 
-                {module.description && (
-                  <p className="module-card-description">{module.description}</p>
-                )}
-
-                <div className="module-card-stats">
-                  <div className="stat-item">
-                    <span className="stat-icon">📝</span>
-                    <span className="stat-text">
-                      {module.stepsCount} {module.stepsCount === 1 ? 'шаг' : module.stepsCount < 5 ? 'шага' : 'шагов'}
-                    </span>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-icon">👥</span>
-                    <span className="stat-text">
-                      {module.enrollmentsCount} {module.enrollmentsCount === 1 ? 'участник' : module.enrollmentsCount < 5 ? 'участника' : 'участников'}
-                    </span>
-                  </div>
+                <div className="module-card-actions">
+                  <button
+                    className="btn-unlock"
+                    onClick={(e) => handleUnlockModule(module.id, e)}
+                    disabled={unlockingModuleId === module.id}
+                  >
+                    {unlockingModuleId === module.id ? '🔄 Открываю...' : '🔓 Открыть для всех'}
+                  </button>
                 </div>
-
-                {module.isExam && (
-                  <div className="module-badge exam-badge">Экзамен</div>
-                )}
               </div>
             ))}
           </div>

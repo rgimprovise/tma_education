@@ -329,6 +329,7 @@ export class CourseService {
     moduleId: string,
     userIds: string[],
     allCompletedPrevious: boolean,
+    forAll: boolean,
     curatorId: string,
   ): Promise<{ unlocked: number; message: string }> {
     // Проверяем, что модуль существует
@@ -342,7 +343,14 @@ export class CourseService {
 
     let targetUserIds: string[] = [];
 
-    if (allCompletedPrevious) {
+    if (forAll) {
+      // Открываем для всех зарегистрированных учеников
+      const allLearners = await this.prisma.user.findMany({
+        where: { role: 'LEARNER' },
+        select: { id: true },
+      });
+      targetUserIds = allLearners.map((u) => u.id);
+    } else if (allCompletedPrevious) {
       // Находим всех пользователей, которые завершили предыдущий модуль
       const previousModuleIndex = module.index - 1;
 

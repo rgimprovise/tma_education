@@ -16,7 +16,10 @@ export class CourseAdminController {
   /**
    * POST /admin/modules/:moduleId/unlock
    * Открыть модуль для пользователей
-   * Принимает список userIds или флаг allCompletedPrevious
+   * Принимает:
+   *  - userIds: список конкретных пользователей
+   *  - allCompletedPrevious: для тех, кто завершил предыдущий модуль
+   *  - forAll: для всех зарегистрированных учеников
    */
   @Post(':moduleId/unlock')
   @Roles(UserRole.CURATOR, UserRole.ADMIN)
@@ -29,6 +32,7 @@ export class CourseAdminController {
       moduleId,
       dto.userIds || [],
       dto.allCompletedPrevious || false,
+      dto.forAll || false,
       req.user.id,
     );
   }
