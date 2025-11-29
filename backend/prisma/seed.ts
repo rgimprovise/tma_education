@@ -10,6 +10,7 @@ async function main() {
   await prisma.enrollment.deleteMany({});
   await prisma.courseStep.deleteMany({});
   await prisma.courseModule.deleteMany({});
+  await prisma.course.deleteMany({});
   console.log('✅ Очищены существующие данные');
 
   // Создание кураторов и администраторов
@@ -46,9 +47,20 @@ async function main() {
 
   console.log('✅ Созданы пользователи:', rostislav.firstName, '(ADMIN),', ivan.firstName, '(CURATOR)');
 
+  // === СОЗДАНИЕ КУРСА ===
+  const mintoCourse = await prisma.course.create({
+    data: {
+      title: 'Пирамида Минто',
+      description: 'Полный курс по освоению принципа пирамиды Минто для эффективной коммуникации и структурирования информации',
+    },
+  });
+
+  console.log('✅ Создан курс:', mintoCourse.title);
+
   // === МОДУЛЬ 1: Введение в пирамиду Минто ===
   const module1 = await prisma.courseModule.create({
     data: {
+      courseId: mintoCourse.id,
       index: 1,
       title: 'Модуль 1: Введение в пирамиду Минто',
       description:
@@ -364,6 +376,7 @@ SCQR — это простой шаблон для введения в комм�
   // === МОДУЛЬ 2: Структурирование мыслей и экологичная коммуникация ===
   const module2 = await prisma.courseModule.create({
     data: {
+      courseId: mintoCourse.id,
       index: 2,
       title: 'Модуль 2: Структурирование мыслей и экологичная коммуникация',
       description:
@@ -722,6 +735,7 @@ SCQR — это простой шаблон для введения в комм�
   // === МОДУЛЬ 3: Структурированная коммуникация (совещания, презентации, ИИ) ===
   const module3 = await prisma.courseModule.create({
     data: {
+      courseId: mintoCourse.id,
       index: 3,
       title: 'Модуль 3: Структурированная коммуникация и работа с ИИ',
       description:
@@ -1120,6 +1134,7 @@ SCQR — это простой шаблон для введения в комм�
   // === ЭКЗАМЕНАЦИОННЫЙ МОДУЛЬ ===
   const examModule = await prisma.courseModule.create({
     data: {
+      courseId: mintoCourse.id,
       index: 4,
       title: 'Итоговая аттестация',
       description:

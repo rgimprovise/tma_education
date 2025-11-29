@@ -33,9 +33,22 @@ enum UserRole {
   ADMIN
 }
 
+// Учебные курсы (верхний уровень иерархии)
+model Course {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  modules CourseModule[]
+}
+
 // Модули курса (1-3 + экзамен)
 model CourseModule {
   id          String   @id @default(cuid())
+  courseId    String?
+  course      Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
   index       Int      @unique // 1,2,3,4 (4 = экзамен)
   title       String
   description String?
@@ -46,6 +59,8 @@ model CourseModule {
   steps       CourseStep[]
   enrollments Enrollment[]
   submissions Submission[]
+
+  @@index([courseId])
 }
 
 // Шаги/задания внутри модулей
