@@ -547,6 +547,70 @@ export class SubmissionsService {
   }
 
   /**
+   * Удалить сдачу (очистить прогресс ученика по шагу)
+   * Позволяет куратору сбросить прогресс и разрешить повторную сдачу
+   * 
+   * @param submissionId ID сдачи для удаления
+   * @returns Сообщение об успехе
+   */
+  async deleteSubmission(submissionId: string): Promise<{ message: string }> {
+    // 1. Найти submission
+    const submission = await this.prisma.submission.findUnique({
+      where: { id: submissionId },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, telegramId: true } },
+        step: { select: { id: true, title: true, index: true } },
+        module: { select: { id: true, title: true, index: true } },
+      },
+    });
+
+    if (!submission) {
+      throw new NotFoundException('Submission not found');
+    }
+
+    // 2. Удаляем submission
+    await this.prisma.submission.delete({
+      where: { id: submissionId },
+    });
+
+    // 3. Уведомляем ученика (опционально)
+    const userName = `${submission.user.firstName || ''} ${submission.user.lastName || ''}`.trim() || 'Ученик';
+    const notificationText = 
+      `🔄 Сдача задания сброшена\n\n` +
+      `Модуль ${submission.module.index}: ${submission.module.title}\n` +
+      `Шаг ${submission.step.index}: ${submission.step.title}\n\n` +
+      `Куратор удалил вашу сдачу. Вы можете выполнить задание заново.`;
+
+    if (submission.user.telegramId) {
+      this.telegramService
+        .sendMessage(submission.user.telegramId, notificationText)
+        .catch((error) => {
+          console.error('Failed to notify learner about submission deletion:', error);
+        });
+    }
+
+    // 4. Проверяем статус модуля (возможно, он был завершён, а теперь снова незавершён)
+    // Если был COMPLETED, переводим обратно в IN_PROGRESS
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: {
+        userId: submission.userId,
+        moduleId: submission.moduleId,
+      },
+    });
+
+    if (enrollment && enrollment.status === 'COMPLETED') {
+      await this.prisma.enrollment.update({
+        where: { id: enrollment.id },
+        data: { status: 'IN_PROGRESS' },
+      });
+    }
+
+    return {
+      message: `Сдача задания удалена. Ученик ${userName} может выполнить задание заново.`,
+    };
+  }
+
+  /**
    * Проверяет, завершён ли модуль, и обновляет статус Enrollment
    * Модуль считается завершённым, если все обязательные шаги имеют
    * Submission со статусом CURATOR_APPROVED

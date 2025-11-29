@@ -83,5 +83,18 @@ export class SubmissionsAdminController {
       dto.curatorFeedback,
     );
   }
+
+  /**
+   * DELETE /admin/submissions/:id
+   * Удалить сдачу (очистить прогресс по шагу)
+   * Позволяет ученику сдать задание заново
+   */
+  @Post(':id/delete')
+  @Roles(UserRole.CURATOR, UserRole.ADMIN)
+  async deleteSubmission(
+    @Param('id') id: string,
+  ): Promise<{ message: string }> {
+    return this.submissionsService.deleteSubmission(id);
+  }
 }
 

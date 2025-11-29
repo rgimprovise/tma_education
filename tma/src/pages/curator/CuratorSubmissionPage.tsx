@@ -165,6 +165,54 @@ export function CuratorSubmissionPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!submission) return;
+
+    // Подтверждение
+    const userName = `${submission.user.firstName || ''} ${submission.user.lastName || ''}`.trim() || 'Ученик';
+    const confirmMessage = 
+      `Удалить сдачу задания?\n\n` +
+      `Ученик: ${userName}\n` +
+      `Модуль: ${submission.module.title}\n` +
+      `Шаг: ${submission.step.title}\n\n` +
+      `Ученик сможет выполнить задание заново.`;
+
+    const confirmed = window.Telegram?.WebApp 
+      ? await new Promise<boolean>((resolve) => {
+          window.Telegram?.WebApp?.showConfirm(confirmMessage, (result) => {
+            resolve(result);
+          });
+        })
+      : window.confirm(confirmMessage);
+
+    if (!confirmed) return;
+
+    try {
+      setProcessing(true);
+      await api.post(`/admin/submissions/${submission.id}/delete`);
+
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert('🗑️ Сдача удалена. Ученик может выполнить задание заново.', () => {
+          navigate(-1);
+        });
+      } else {
+        alert('🗑️ Сдача удалена');
+        navigate(-1);
+      }
+    } catch (err: any) {
+      console.error('Failed to delete submission:', err);
+      const errorMessage = err.response?.data?.message || 'Ошибка при удалении';
+      
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`❌ ${errorMessage}`);
+      } else {
+        alert(`❌ ${errorMessage}`);
+      }
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const renderAnswerContent = () => {
     if (!submission) return null;
 
@@ -396,6 +444,22 @@ export function CuratorSubmissionPage() {
           )}
         </div>
       )}
+
+      {/* Кнопка удаления сдачи - всегда доступна */}
+      <div className="card danger-zone-card">
+        <h3 className="section-title danger-title">⚠️ Опасная зона</h3>
+        <p className="danger-description">
+          Удаление сдачи сбросит весь прогресс ученика по этому заданию.
+          Ученик сможет выполнить задание заново.
+        </p>
+        <button
+          className="btn btn-delete"
+          onClick={handleDelete}
+          disabled={processing}
+        >
+          {processing ? 'Удаление...' : '🗑️ Удалить сдачу'}
+        </button>
+      </div>
     </div>
   );
 }
