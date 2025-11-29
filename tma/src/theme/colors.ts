@@ -67,6 +67,9 @@ export function getTelegramTheme(): ThemeColors {
   const params = tg.themeParams;
 
   // Используем цвета из Telegram, если они доступны
+  // Note: некоторые свойства могут отсутствовать в типизации, но существовать в runtime
+  const themeParams = params as any;
+  
   return {
     primary: params.button_color || defaultTheme.primary,
     primarySoft: params.secondary_bg_color || defaultTheme.primarySoft,
@@ -80,11 +83,11 @@ export function getTelegramTheme(): ThemeColors {
     textSecondary: params.hint_color || defaultTheme.textSecondary,
     textOnPrimary: params.button_text_color || defaultTheme.textOnPrimary,
     
-    border: params.section_separator_color || defaultTheme.border,
+    border: themeParams.section_separator_color || defaultTheme.border,
     
     success: defaultTheme.success,
     warning: defaultTheme.warning,
-    error: params.destructive_text_color || defaultTheme.error,
+    error: themeParams.destructive_text_color || defaultTheme.error,
     info: params.link_color || defaultTheme.info,
   };
 }
