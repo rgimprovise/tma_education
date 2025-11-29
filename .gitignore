@@ -24,9 +24,6 @@ dist/
 *.swo
 *~
 
-# Prisma
-backend/prisma/migrations/
-
 # TMA
 tma/dist/
 tma/.vite/
