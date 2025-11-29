@@ -30,7 +30,7 @@ export class CourseBuilderController {
    * Список всех модулей с количеством шагов
    */
   @Get('modules')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.CURATOR)
   async findAllModules() {
     return this.courseAdminService.findAllModules();
   }
@@ -40,9 +40,19 @@ export class CourseBuilderController {
    * Получить модуль по ID
    */
   @Get('modules/:id')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.CURATOR)
   async findModuleById(@Param('id') id: string) {
     return this.courseAdminService.findModuleById(id);
+  }
+
+  /**
+   * GET /admin/course/modules/:id/stats
+   * Получить статистику по модулю
+   */
+  @Get('modules/:id/stats')
+  @Roles(UserRole.ADMIN, UserRole.CURATOR)
+  async getModuleStats(@Param('id') id: string) {
+    return this.courseAdminService.getModuleStats(id);
   }
 
   /**
@@ -80,7 +90,7 @@ export class CourseBuilderController {
    * Список шагов модуля
    */
   @Get('modules/:moduleId/steps')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.CURATOR)
   async findModuleSteps(@Param('moduleId') moduleId: string) {
     return this.courseAdminService.findModuleSteps(moduleId);
   }

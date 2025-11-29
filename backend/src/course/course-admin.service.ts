@@ -345,5 +345,57 @@ export class CourseAdminService {
 
     return { message: 'Step deleted successfully' };
   }
+
+  /**
+   * Получить статистику по модулю
+   */
+  async getModuleStats(moduleId: string) {
+    // Проверяем, что модуль существует
+    const module = await this.prisma.courseModule.findUnique({
+      where: { id: moduleId },
+    });
+
+    if (!module) {
+      throw new NotFoundException('Module not found');
+    }
+
+    // Получаем статистику по enrollments
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { moduleId },
+      select: {
+        status: true,
+      },
+    });
+
+    const totalLearners = enrollments.length;
+    const inProgressLearners = enrollments.filter(
+      (e) => e.status === 'IN_PROGRESS',
+    ).length;
+    const completedLearners = enrollments.filter(
+      (e) => e.status === 'COMPLETED',
+    ).length;
+
+    // Получаем статистику по submissions (все сдачи по шагам этого модуля)
+    const submissions = await this.prisma.submission.findMany({
+      where: { moduleId },
+      select: {
+        status: true,
+      },
+    });
+
+    const submissionsTotal = submissions.length;
+    const submissionsOnReview = submissions.filter(
+      (s) => s.status === 'SENT' || s.status === 'AI_REVIEWED',
+    ).length;
+
+    return {
+      moduleId,
+      totalLearners,
+      inProgressLearners,
+      completedLearners,
+      submissionsTotal,
+      submissionsOnReview,
+    };
+  }
 }
 

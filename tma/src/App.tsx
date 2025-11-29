@@ -10,6 +10,7 @@ import { SubmissionsPage } from './pages/SubmissionsPage';
 import { LoginPage } from './pages/LoginPage';
 import { IncompleteProfilePage } from './pages/IncompleteProfilePage';
 import { CuratorCoursesDashboardPage } from './pages/curator/CuratorCoursesDashboardPage';
+import { CourseDashboardPage } from './pages/curator/CourseDashboardPage';
 import { CuratorDashboardPage } from './pages/CuratorDashboardPage';
 import { CuratorUserPage } from './pages/CuratorUserPage';
 import { CourseBuilderPage } from './pages/CourseBuilderPage';
@@ -97,6 +98,26 @@ function App() {
               <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
                 <CuratorLayout>
                   <CuratorCoursesDashboardPage />
+                </CuratorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/curator/courses/:moduleId"
+            element={
+              <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
+                <CuratorLayout>
+                  <CourseDashboardPage />
+                </CuratorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/curator/courses/:moduleId/learners"
+            element={
+              <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
+                <CuratorLayout>
+                  <CuratorDashboardPage />
                 </CuratorLayout>
               </ProtectedRoute>
             }
