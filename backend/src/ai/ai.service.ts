@@ -115,8 +115,8 @@ ${answerText}
       this.logger.log(`Starting transcription for file: ${filename}`);
 
       // Создаём File-like объект для OpenAI API
-      // В Node.js окружении используем toFile() из openai SDK
-      const file = await this.openai.toFile(audioBuffer, filename);
+      // В Node.js окружении используем статический метод OpenAI.toFile()
+      const file = await OpenAI.toFile(audioBuffer, filename);
 
       // Вызываем Whisper API
       const transcription = await this.openai.audio.transcriptions.create({
