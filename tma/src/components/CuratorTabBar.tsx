@@ -30,8 +30,8 @@ export function CuratorTabBar() {
     {
       id: 'builder',
       label: '🔧 Конструктор',
-      path: '/curator/course',
-      matcher: /^\/curator\/course/,
+      path: '/curator/course-builder',
+      matcher: /^\/curator\/course-builder|^\/curator\/course/,
     },
   ];
 

@@ -2,6 +2,10 @@ import { IsString, IsOptional, IsInt, IsBoolean, Min, Max } from 'class-validato
 
 export class CreateModuleDto {
   @IsString()
+  @IsOptional()
+  courseId?: string; // ID курса, к которому относится модуль
+
+  @IsString()
   title: string;
 
   @IsString()

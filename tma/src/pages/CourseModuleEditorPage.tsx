@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
 import './CourseModuleEditorPage.css';
 
 interface ModuleData {
+  courseId?: string;
   title: string;
   description: string;
   index: number;
@@ -13,9 +14,13 @@ interface ModuleData {
 export function CourseModuleEditorPage() {
   const { moduleId } = useParams<{ moduleId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const courseId = searchParams.get('courseId') || undefined;
+  
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<ModuleData>({
+    courseId,
     title: '',
     description: '',
     index: 1,
@@ -56,7 +61,15 @@ export function CourseModuleEditorPage() {
       } else {
         await api.patch(`/admin/course/modules/${moduleId}`, formData);
       }
-      navigate('/curator/course');
+      
+      // Возвращаемся на правильную страницу
+      if (courseId) {
+        // Если был courseId, возвращаемся на страницу модулей этого курса
+        navigate(`/curator/course-builder/${courseId}`);
+      } else {
+        // Иначе возвращаемся на общую страницу конструктора
+        navigate('/curator/course-builder');
+      }
     } catch (err: any) {
       console.error('Failed to save module:', err);
       alert(err.response?.data?.message || 'Ошибка сохранения модуля');

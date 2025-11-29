@@ -15,6 +15,8 @@ import { CourseDashboardPage } from './pages/curator/CourseDashboardPage';
 import { CuratorDashboardPage } from './pages/CuratorDashboardPage';
 import { CuratorUserPage } from './pages/CuratorUserPage';
 import { CourseBuilderPage } from './pages/CourseBuilderPage';
+import { CourseBuilderCoursesPage } from './pages/CourseBuilder/CourseBuilderCoursesPage';
+import { CourseBuilderModulesPage } from './pages/CourseBuilder/CourseBuilderModulesPage';
 import { CourseModuleEditorPage } from './pages/CourseModuleEditorPage';
 import { CourseStepsPage } from './pages/CourseStepsPage';
 import { CourseStepEditorPage } from './pages/CourseStepEditorPage';
@@ -139,6 +141,26 @@ function App() {
           />
           
           {/* Роуты для конструктора курса */}
+          <Route
+            path="/curator/course-builder"
+            element={
+              <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
+                <CuratorLayout>
+                  <CourseBuilderCoursesPage />
+                </CuratorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/curator/course-builder/:courseId"
+            element={
+              <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
+                <CuratorLayout>
+                  <CourseBuilderModulesPage />
+                </CuratorLayout>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/curator/course"
             element={

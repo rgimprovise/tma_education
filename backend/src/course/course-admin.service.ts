@@ -71,8 +71,19 @@ export class CourseAdminService {
       throw new ConflictException(`Module with index ${dto.index} already exists`);
     }
 
+    // Если указан courseId, проверяем что курс существует
+    if (dto.courseId) {
+      const course = await this.prisma.course.findUnique({
+        where: { id: dto.courseId },
+      });
+      if (!course) {
+        throw new NotFoundException(`Course with id ${dto.courseId} not found`);
+      }
+    }
+
     return this.prisma.courseModule.create({
       data: {
+        courseId: dto.courseId, // Привязка к курсу (может быть undefined)
         title: dto.title,
         description: dto.description,
         index: dto.index,
