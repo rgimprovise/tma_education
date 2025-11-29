@@ -67,19 +67,51 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     try {
       this.setupHandlers();
       
-      // Запускаем бота через polling в фоновом режиме (для разработки)
-      // В production можно использовать webhook
-      // Не используем await, чтобы не блокировать запуск основного приложения
-      this.bot.start().then(() => {
-        this.isRunning = true;
-        this.bot.api.getMe().then((botInfo) => {
-          this.logger.log(`🤖 Telegram Bot started: @${botInfo.username}`);
-        });
-      }).catch((error) => {
-        this.logger.error('Failed to start Telegram Bot:', error);
-      });
-      
+      // Запускаем бота через polling в фоновом режиме
       this.logger.log('Telegram Bot initialization started...');
+      
+      // Добавляем timeout для диагностики зависаний
+      const startTimeout = setTimeout(() => {
+        if (!this.isRunning) {
+          this.logger.error('⚠️ Telegram Bot start timeout (30s). Possible causes:');
+          this.logger.error('  - Another process is using this bot token (long polling conflict)');
+          this.logger.error('  - Network connectivity issues');
+          this.logger.error('  - Firewall blocking Telegram API');
+          this.logger.error('Consider using webhook instead of polling for production.');
+        }
+      }, 30000);
+      
+      this.bot.start()
+        .then(() => {
+          clearTimeout(startTimeout);
+          this.isRunning = true;
+          this.logger.log('✅ Bot polling started successfully');
+          
+          return this.bot.api.getMe();
+        })
+        .then((botInfo) => {
+          this.logger.log(`🤖 Telegram Bot started: @${botInfo.username}`);
+          this.logger.log(`Bot ID: ${botInfo.id}`);
+          this.logger.log(`Can read all messages: ${botInfo.can_read_all_group_messages}`);
+        })
+        .catch((error) => {
+          clearTimeout(startTimeout);
+          this.logger.error('❌ Failed to start Telegram Bot:');
+          this.logger.error(`Error type: ${error.constructor.name}`);
+          this.logger.error(`Error message: ${error.message}`);
+          if (error.stack) {
+            this.logger.error(`Stack: ${error.stack.split('\n').slice(0, 3).join('\n')}`);
+          }
+          
+          // Проверяем распространенные проблемы
+          if (error.message?.includes('409')) {
+            this.logger.error('🔴 CONFLICT: Another instance is using this bot token!');
+            this.logger.error('   Solution: Stop other bot instances or use webhook mode');
+          } else if (error.message?.includes('401')) {
+            this.logger.error('🔴 UNAUTHORIZED: Bot token is invalid');
+            this.logger.error('   Solution: Check TELEGRAM_BOT_TOKEN in .env');
+          }
+        });
     } catch (error) {
       this.logger.error('Error initializing Telegram Bot:', error);
     }
