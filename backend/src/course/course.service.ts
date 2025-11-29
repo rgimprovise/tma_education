@@ -227,6 +227,14 @@ export class CourseService {
       throw new NotFoundException('Module not found');
     }
 
+    // Получаем enrollment пользователя для этого модуля
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: {
+        userId,
+        moduleId,
+      },
+    });
+
     // Получаем все шаги модуля
     const steps = await this.prisma.courseStep.findMany({
       where: { moduleId },
@@ -259,12 +267,25 @@ export class CourseService {
         formSchema: step.formSchema || undefined,
         aiRubric: step.aiRubric || undefined,
         isRequired: step.isRequired,
+        module: {
+          id: module.id,
+          title: module.title,
+          enrollment: enrollment
+            ? {
+                id: enrollment.id,
+                status: enrollment.status,
+              }
+            : undefined,
+        },
         submission: submission
           ? {
               id: submission.id,
               status: submission.status,
+              answerText: submission.answerText || undefined,
               aiScore: submission.aiScore || undefined,
+              aiFeedback: submission.aiFeedback || undefined,
               curatorScore: submission.curatorScore || undefined,
+              curatorFeedback: submission.curatorFeedback || undefined,
               createdAt: submission.createdAt,
             }
           : undefined,
