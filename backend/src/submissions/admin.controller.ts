@@ -37,6 +37,16 @@ export class SubmissionsAdminController {
   }
 
   /**
+   * GET /admin/submissions/:id
+   * Получить детали конкретной сдачи (для проверки куратором)
+   */
+  @Get(':id')
+  @Roles(UserRole.CURATOR, UserRole.ADMIN)
+  async getSubmissionById(@Param('id') id: string): Promise<SubmissionResponseDto> {
+    return this.submissionsService.findById(id);
+  }
+
+  /**
    * POST /admin/submissions/:id/approve
    * Одобрить сдачу
    * Выставляет curatorScore, curatorFeedback, статус CURATOR_APPROVED

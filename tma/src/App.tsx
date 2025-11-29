@@ -14,6 +14,7 @@ import { CuratorCoursesDashboardPage } from './pages/curator/CuratorCoursesDashb
 import { CourseDashboardPage } from './pages/curator/CourseDashboardPage';
 import { CuratorDashboardPage } from './pages/CuratorDashboardPage';
 import { CuratorUserPage } from './pages/CuratorUserPage';
+import { CuratorSubmissionPage } from './pages/curator/CuratorSubmissionPage';
 import { CourseBuilderPage } from './pages/CourseBuilderPage';
 import { CourseBuilderCoursesPage } from './pages/CourseBuilder/CourseBuilderCoursesPage';
 import { CourseBuilderModulesPage } from './pages/CourseBuilder/CourseBuilderModulesPage';
@@ -135,6 +136,16 @@ function App() {
               <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
                 <CuratorLayout>
                   <CuratorUserPage />
+                </CuratorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/curator/submissions/:submissionId"
+            element={
+              <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
+                <CuratorLayout>
+                  <CuratorSubmissionPage />
                 </CuratorLayout>
               </ProtectedRoute>
             }

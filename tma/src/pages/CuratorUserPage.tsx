@@ -249,7 +249,11 @@ export function CuratorUserPage() {
           <div className="empty-state">Нет сдач</div>
         ) : (
           learner.recentSubmissions.map((submission) => (
-            <div key={submission.id} className="card submission-card">
+            <div
+              key={submission.id}
+              className="card submission-card clickable"
+              onClick={() => navigate(`/curator/submissions/${submission.id}`)}
+            >
               <div className="card-title">
                 Модуль {submission.module.index}, Шаг {submission.step.index}: {submission.step.title}
               </div>
