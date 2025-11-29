@@ -26,21 +26,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Проверяем, не сменился ли пользователь Telegram
-    const currentTelegramId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id?.toString();
-    const savedTelegramId = localStorage.getItem('telegram_id');
-    
-    // Если Telegram ID изменился - очищаем всё (смена аккаунта)
-    if (currentTelegramId && savedTelegramId && currentTelegramId !== savedTelegramId) {
-      console.log('Telegram user changed, clearing auth data');
-      localStorage.clear();
-      setToken(null);
-      setUser(null);
-      delete api.defaults.headers.common['Authorization'];
-      setIsLoading(false);
-      return;
-    }
-    
     // Попытка восстановить сессию из localStorage
     const savedToken = localStorage.getItem('token');
     if (savedToken) {
@@ -52,14 +37,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .get('/users/me')
         .then((response) => {
           setUser(response.data);
-          // Сохраняем Telegram ID для проверки при следующем запуске
-          if (currentTelegramId) {
-            localStorage.setItem('telegram_id', currentTelegramId);
-          }
         })
         .catch(() => {
           // Токен невалиден, очищаем
-          localStorage.clear();
+          localStorage.removeItem('token');
           setToken(null);
           delete api.defaults.headers.common['Authorization'];
         })
@@ -78,13 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(access_token);
       setUser(userData);
       localStorage.setItem('token', access_token);
-      
-      // Сохраняем Telegram ID для проверки при следующем запуске
-      const currentTelegramId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id?.toString();
-      if (currentTelegramId) {
-        localStorage.setItem('telegram_id', currentTelegramId);
-      }
-      
       api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
     } catch (error) {
       console.error('Login error:', error);
