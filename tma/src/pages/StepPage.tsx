@@ -280,11 +280,15 @@ export function StepPage() {
       // Показываем успешное сообщение с инструкцией
       if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.showAlert(
-          '✅ Инструкция отправлена!\n\n' +
-          'Перейдите в диалог с ботом и отправьте голосовое сообщение ' +
-          '**ответом (реплаем)** на инструкцию бота.\n\n' +
-          '⚠️ Важно: отправьте аудио именно ответом на сообщение бота, ' +
-          'иначе он не сможет связать его с заданием.'
+          '✅ Инструкция отправлена в чат с ботом!\n\n' +
+          'Вернитесь в диалог с ботом и отправьте голосовое сообщение ' +
+          'ОТВЕТОМ (реплаем) на инструкцию.\n\n' +
+          '⚠️ Важно: обязательно отправьте аудио ответом на сообщение бота, ' +
+          'иначе он не сможет связать его с заданием.',
+          () => {
+            // После закрытия alert - закрываем Mini App, чтобы пользователь вернулся в чат
+            window.Telegram.WebApp.close();
+          }
         );
       } else {
         alert(
@@ -337,67 +341,91 @@ export function StepPage() {
 
       {step.type === 'TASK' || step.type === 'QUIZ' || step.type === 'EXAM' ? (
         <div className="step-form">
-          {step.formSchema && step.formSchema.fields && step.formSchema.fields.length > 0 ? (
-            // Динамическая форма по схеме
-            <div className="dynamic-form">
-              {step.formSchema.fields.map((field) => (
-                <div key={field.id} className="form-group">
-                  <label className="form-label">
-                    {field.label}
-                    {field.required && <span className="required-mark"> *</span>}
-                  </label>
-                  {field.type === 'textarea' ? (
-                    <textarea
-                      className="form-textarea"
-                      value={formAnswers[field.id] || ''}
-                      onChange={(e) =>
-                        setFormAnswers({ ...formAnswers, [field.id]: e.target.value })
-                      }
-                      placeholder={`Введите ${field.label.toLowerCase()}...`}
-                      disabled={hasSubmission && !isReturned}
-                      rows={4}
-                    />
-                  ) : field.type === 'file' ? (
-                    <div className="file-input-hint">
-                      <p>Для отправки файла отправьте его боту в Telegram, затем вставьте file_id здесь.</p>
-                      <input
-                        className="form-input"
-                        type="text"
-                        value={formAnswers[field.id] || ''}
-                        onChange={(e) =>
-                          setFormAnswers({ ...formAnswers, [field.id]: e.target.value })
-                        }
-                        placeholder="file_id из Telegram"
-                        disabled={hasSubmission && !isReturned}
-                      />
-                    </div>
-                  ) : (
-                    <input
-                      className="form-input"
-                      type="text"
-                      value={formAnswers[field.id] || ''}
-                      onChange={(e) =>
-                        setFormAnswers({ ...formAnswers, [field.id]: e.target.value })
-                      }
-                      placeholder={`Введите ${field.label.toLowerCase()}...`}
-                      disabled={hasSubmission && !isReturned}
-                    />
-                  )}
+          {/* Специальный UX для AUDIO/VIDEO заданий */}
+          {(step.expectedAnswer === 'AUDIO' || step.expectedAnswer === 'VIDEO') ? (
+            <>
+              {/* Инструкция для аудио-сдачи */}
+              {(!hasSubmission || isReturned) && (
+                <div className="audio-submission-info">
+                  <div className="info-card">
+                    <h3>🎤 Аудио-задание</h3>
+                    <p>Это задание нужно сдать голосовым сообщением в Telegram.</p>
+                    <ol className="instruction-list">
+                      <li>Нажмите кнопку «Сдать голосовым сообщением» ниже.</li>
+                      <li>В чат с ботом придёт сообщение с инструкцией.</li>
+                      <li>Запишите голосовое сообщение и отправьте его <strong>ответом (реплаем)</strong> на инструкцию бота.</li>
+                      <li>Бот автоматически обработает ваш ответ и отправит куратору на проверку.</li>
+                    </ol>
+                  </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           ) : (
-            // Обычное текстовое поле (fallback)
-            <div className="form-group">
-              <label className="form-label">Ваш ответ:</label>
-              <textarea
-                className="form-textarea"
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                placeholder="Введите ваш ответ..."
-                disabled={hasSubmission && !isReturned}
-              />
-            </div>
+            // Обычная форма для TEXT/FILE заданий
+            <>
+              {step.formSchema && step.formSchema.fields && step.formSchema.fields.length > 0 ? (
+                // Динамическая форма по схеме
+                <div className="dynamic-form">
+                  {step.formSchema.fields.map((field) => (
+                    <div key={field.id} className="form-group">
+                      <label className="form-label">
+                        {field.label}
+                        {field.required && <span className="required-mark"> *</span>}
+                      </label>
+                      {field.type === 'textarea' ? (
+                        <textarea
+                          className="form-textarea"
+                          value={formAnswers[field.id] || ''}
+                          onChange={(e) =>
+                            setFormAnswers({ ...formAnswers, [field.id]: e.target.value })
+                          }
+                          placeholder={`Введите ${field.label.toLowerCase()}...`}
+                          disabled={hasSubmission && !isReturned}
+                          rows={4}
+                        />
+                      ) : field.type === 'file' ? (
+                        <div className="file-input-hint">
+                          <p>Для отправки файла отправьте его боту в Telegram, затем вставьте file_id здесь.</p>
+                          <input
+                            className="form-input"
+                            type="text"
+                            value={formAnswers[field.id] || ''}
+                            onChange={(e) =>
+                              setFormAnswers({ ...formAnswers, [field.id]: e.target.value })
+                            }
+                            placeholder="file_id из Telegram"
+                            disabled={hasSubmission && !isReturned}
+                          />
+                        </div>
+                      ) : (
+                        <input
+                          className="form-input"
+                          type="text"
+                          value={formAnswers[field.id] || ''}
+                          onChange={(e) =>
+                            setFormAnswers({ ...formAnswers, [field.id]: e.target.value })
+                          }
+                          placeholder={`Введите ${field.label.toLowerCase()}...`}
+                          disabled={hasSubmission && !isReturned}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                // Обычное текстовое поле (fallback)
+                <div className="form-group">
+                  <label className="form-label">Ваш ответ:</label>
+                  <textarea
+                    className="form-textarea"
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    placeholder="Введите ваш ответ..."
+                    disabled={hasSubmission && !isReturned}
+                  />
+                </div>
+              )}
+            </>
           )}
 
           {error && <div className="error">{error}</div>}
@@ -411,6 +439,17 @@ export function StepPage() {
                 {step.submission.status === 'CURATOR_APPROVED' && '✅ Одобрено куратором'}
                 {step.submission.status === 'CURATOR_RETURNED' && '🔄 Возвращено на доработку'}
               </div>
+
+              {/* Показываем транскрипт для аудио-сдач */}
+              {(step.expectedAnswer === 'AUDIO' || step.expectedAnswer === 'VIDEO') && 
+               step.submission.answerText && (
+                <div className="transcript-block">
+                  <div className="feedback-title">
+                    {step.expectedAnswer === 'AUDIO' ? '🎤 Транскрипт голосового сообщения:' : '📹 Транскрипт видео:'}
+                  </div>
+                  <div className="transcript-text">{step.submission.answerText}</div>
+                </div>
+              )}
 
               {/* Блок ИИ - ТОЛЬКО для кураторов/админов */}
               {!isLearner && step.submission.aiScore !== null && step.submission.aiScore !== undefined && (
@@ -468,34 +507,34 @@ export function StepPage() {
 
           {(!hasSubmission || isReturned) && (
             <>
-              <button
-                className="btn btn-primary"
-                onClick={handleSubmit}
-                disabled={
-                  submitting ||
-                  (step.formSchema && step.formSchema.fields && step.formSchema.fields.length > 0
-                    ? step.formSchema.fields
-                        .filter((f) => f.required)
-                        .some((f) => !formAnswers[f.id]?.trim())
-                    : !answer.trim())
-                }
-              >
-                {submitting ? 'Отправка...' : 'Отправить на проверку'}
-              </button>
-
-              {/* Кнопка для аудио/видео сдачи */}
-              {(step.expectedAnswer === 'AUDIO' || step.expectedAnswer === 'VIDEO') && (
+              {/* Для AUDIO/VIDEO - только кнопка аудио-сдачи */}
+              {(step.expectedAnswer === 'AUDIO' || step.expectedAnswer === 'VIDEO') ? (
                 <button
-                  className="btn btn-secondary"
+                  className="btn btn-primary"
                   onClick={handleStartAudioSubmission}
                   disabled={startingAudioSubmission}
-                  style={{ marginTop: '8px' }}
                 >
                   {startingAudioSubmission 
-                    ? 'Отправка инструкции...' 
+                    ? '⏳ Отправка инструкции...' 
                     : step.expectedAnswer === 'AUDIO' 
                       ? '🎤 Сдать голосовым сообщением' 
                       : '📹 Сдать видео-сообщением'}
+                </button>
+              ) : (
+                // Для TEXT/FILE - обычная кнопка отправки
+                <button
+                  className="btn btn-primary"
+                  onClick={handleSubmit}
+                  disabled={
+                    submitting ||
+                    (step.formSchema && step.formSchema.fields && step.formSchema.fields.length > 0
+                      ? step.formSchema.fields
+                          .filter((f) => f.required)
+                          .some((f) => !formAnswers[f.id]?.trim())
+                      : !answer.trim())
+                  }
+                >
+                  {submitting ? 'Отправка...' : 'Отправить на проверку'}
                 </button>
               )}
             </>
