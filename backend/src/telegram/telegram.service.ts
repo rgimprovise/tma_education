@@ -670,12 +670,17 @@ ${submission.curatorFeedback || 'Требуется доработка'}
     }
 
     try {
-      const result = await this.bot.api.setWebhook(webhookUrl);
+      const result = await this.bot.api.setWebhook(webhookUrl, {
+        max_connections: 100, // Увеличено с 40 (default) до 100 для лучшей производительности
+        drop_pending_updates: false, // Сохраняем необработанные обновления
+      });
       this.logger.log(`✅ Webhook set to: ${webhookUrl}`);
+      this.logger.log(`   Max connections: 100`);
       return {
         ok: true,
         message: 'Webhook set successfully',
         url: webhookUrl,
+        maxConnections: 100,
         result,
       };
     } catch (error: any) {

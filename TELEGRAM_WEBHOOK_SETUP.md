@@ -83,7 +83,8 @@ curl -X POST https://tma.n8nrgimprovise.space/api/telegram/set-webhook \
 
 ```bash
 curl -X POST https://api.telegram.org/bot8580479721:AAF3Pn_h623BNYrAnJBJjD0LFpaYu13A-Mw/setWebhook \
-  -d "url=https://tma.n8nrgimprovise.space/api/telegram/webhook"
+  -d "url=https://tma.n8nrgimprovise.space/api/telegram/webhook" \
+  -d "max_connections=100"
 ```
 
 **Ожидаемый ответ:**
@@ -91,9 +92,14 @@ curl -X POST https://api.telegram.org/bot8580479721:AAF3Pn_h623BNYrAnJBJjD0LFpaY
 {
   "ok": true,
   "message": "Webhook set successfully",
-  "url": "https://tma.n8nrgimprovise.space/api/telegram/webhook"
+  "url": "https://tma.n8nrgimprovise.space/api/telegram/webhook",
+  "maxConnections": 100
 }
 ```
+
+**Параметры webhook:**
+- `max_connections: 100` - максимум одновременных HTTPS-соединений (default: 40, max: 100)
+- Увеличено для лучшей производительности при высокой нагрузке
 
 ### Шаг 5: Проверить webhook
 
@@ -200,7 +206,10 @@ pm2 restart minto-backend
    ```bash
    curl https://api.telegram.org/bot8580479721:AAF3Pn_h623BNYrAnJBJjD0LFpaYu13A-Mw/getWebhookInfo
    ```
-   Должно быть `"url": "https://..."`, `"pending_update_count": 0`
+   Должно быть:
+   - `"url": "https://..."`
+   - `"pending_update_count": 0`
+   - `"max_connections": 100` (если установлено правильно)
 
 ### Проблема: "Bot is not running"
 
@@ -311,7 +320,57 @@ ngrok http 3000
 
 ---
 
+## ⚡ Производительность
+
+### Max Connections
+
+**Что это:**
+- Максимальное количество одновременных HTTPS-соединений от Telegram к вашему серверу
+- Default: 40
+- Maximum: 100 (установлено в нашей конфигурации)
+
+**Когда увеличивать:**
+- ✅ Много пользователей (>100 активных)
+- ✅ Высокая частота сообщений
+- ✅ Обработка медиафайлов (аудио/видео)
+- ✅ Production environment
+
+**Когда оставить 40:**
+- Малое количество пользователей (<50)
+- Тестовое окружение
+- Локальная разработка
+
+**Как проверить текущее значение:**
+```bash
+curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo | jq '.result.max_connections'
+```
+
+**Влияние на производительность:**
+- `max_connections: 40` → до 40 одновременных update'ов
+- `max_connections: 100` → до 100 одновременных update'ов
+- При превышении → обновления становятся в очередь (`pending_update_count`)
+
+### Мониторинг нагрузки
+
+**Проверить pending updates:**
+```bash
+curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo | jq '.result.pending_update_count'
+```
+
+**Если pending_update_count > 0:**
+- Ваш сервер не успевает обрабатывать updates
+- Рассмотрите оптимизацию бэкенда
+- Проверьте скорость ответа API
+- Убедитесь, что max_connections = 100
+
+**Рекомендация:**
+- Всегда устанавливайте `max_connections: 100` для production
+- Мониторьте `pending_update_count` через webhook info
+- Если `pending_update_count` постоянно > 10 → оптимизируйте обработку
+
+---
+
 **Автор:** AI Assistant (Cursor)  
 **Дата:** 2025-11-29  
-**Версия:** 1.0
+**Версия:** 1.1 (добавлен max_connections: 100)
 
