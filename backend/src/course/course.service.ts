@@ -156,7 +156,8 @@ export class CourseService {
 
   /**
    * Определяет текущий модуль для кнопки "Продолжить обучение"
-   * Возвращает первый модуль со статусом IN_PROGRESS или первый LOCKED (если нет IN_PROGRESS)
+   * Возвращает первый модуль со статусом IN_PROGRESS
+   * Если нет IN_PROGRESS модулей, возвращает null (нужно ждать разблокировки куратором)
    */
   async getCurrentModule(userId: string): Promise<ModuleWithProgressDto | null> {
     const modules = await this.getModulesWithProgress(userId);
@@ -166,17 +167,7 @@ export class CourseService {
       (m) => m.enrollment?.status === 'IN_PROGRESS',
     );
 
-    if (inProgressModule) {
-      return inProgressModule;
-    }
-
-    // Если нет IN_PROGRESS, возвращаем первый LOCKED модуль
-    // (который можно открыть куратором)
-    const lockedModule = modules.find(
-      (m) => m.enrollment?.status === 'LOCKED',
-    );
-
-    return lockedModule || null;
+    return inProgressModule || null;
   }
 
   /**
