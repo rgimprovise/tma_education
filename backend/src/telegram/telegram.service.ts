@@ -6,6 +6,27 @@ import { isCurator } from '../users/curators.config';
 import { UserRole } from '@prisma/client';
 
 /**
+ * Состояния регистрации пользователя
+ */
+enum RegistrationState {
+  WAITING_FIRST_NAME = 'WAITING_FIRST_NAME',
+  WAITING_LAST_NAME = 'WAITING_LAST_NAME',
+  WAITING_POSITION = 'WAITING_POSITION',
+}
+
+/**
+ * Данные состояния регистрации пользователя
+ */
+interface UserRegistrationData {
+  state: RegistrationState;
+  userId: string;
+  telegramId: string;
+  firstName?: string;
+  lastName?: string;
+  position?: string;
+}
+
+/**
  * TelegramService - сервис для работы с Telegram Bot
  * Использует библиотеку grammY
  */
@@ -15,6 +36,9 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private bot: Bot;
   private tmaUrl: string;
   private isRunning = false;
+  
+  // Хранилище состояний регистрации пользователей (telegramId -> RegistrationData)
+  private registrationStates: Map<string, UserRegistrationData> = new Map();
 
   constructor(
     private configService: ConfigService,
@@ -82,39 +106,156 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     // Команда /start
     this.bot.command('start', async (ctx: Context) => {
       try {
+        await this.handleStartCommand(ctx);
+      } catch (error) {
+        this.logger.error('Error handling /start command:', error);
+        await ctx.reply('❌ Произошла ошибка. Попробуйте позже.');
+      }
+    });
+
+    // Обработка текстовых сообщений (для диалога регистрации)
+    this.bot.on('message:text', async (ctx: Context) => {
+      try {
+        // Проверяем, находится ли пользователь в процессе регистрации
         const telegramId = ctx.from?.id.toString();
-        if (!telegramId) {
-          await ctx.reply('❌ Не удалось определить ваш Telegram ID. Попробуйте позже.');
-          return;
+        if (!telegramId) return;
+
+        const registrationData = this.registrationStates.get(telegramId);
+        if (registrationData) {
+          await this.handleRegistrationStep(ctx, registrationData);
         }
+      } catch (error) {
+        this.logger.error('Error handling text message:', error);
+        await ctx.reply('❌ Произошла ошибка. Попробуйте снова или отправьте /start.');
+      }
+    });
 
-        // Определение роли: кураторы определяются по telegram_id
-        const role: UserRole = isCurator(telegramId) ? 'CURATOR' : 'LEARNER';
+    // Обработка callback_query для куратора (заглушка, будет реализовано позже)
+    this.bot.callbackQuery(/^curator_/, async (ctx: Context) => {
+      await ctx.answerCallbackQuery('Функция в разработке');
+    });
+  }
 
-        // Поиск или создание пользователя
-        let user = await this.usersService.findByTelegramId(telegramId);
-        if (!user) {
-          user = await this.usersService.create({
-            telegramId,
-            firstName: ctx.from.first_name,
-            lastName: ctx.from.last_name,
-            role,
-          });
-          this.logger.log(`New user created: ${telegramId} with role ${role}`);
-        } else {
-          // Обновляем роль существующего пользователя, если он куратор
-          // (на случай, если куратор был добавлен после регистрации)
-          if (isCurator(telegramId) && user.role !== 'CURATOR' && user.role !== 'ADMIN') {
-            user = await this.usersService.update(user.id, { role: 'CURATOR' });
-            this.logger.log(`User ${telegramId} role updated to CURATOR`);
-          }
-        }
+  /**
+   * Обработка команды /start
+   */
+  private async handleStartCommand(ctx: Context) {
+    const telegramId = ctx.from?.id.toString();
+    if (!telegramId) {
+      await ctx.reply('❌ Не удалось определить ваш Telegram ID. Попробуйте позже.');
+      return;
+    }
 
-        // Формируем приветственное сообщение
-        const welcomeMessage = this.getWelcomeMessage(user.role);
+    // Определение роли: кураторы определяются по telegram_id
+    const role: UserRole = isCurator(telegramId) ? 'CURATOR' : 'LEARNER';
 
-        // Отправка кнопки для открытия Mini App
-        await ctx.reply(welcomeMessage, {
+    // Поиск или создание пользователя
+    let user = await this.usersService.findByTelegramId(telegramId);
+    
+    if (!user) {
+      // Создаём нового пользователя с данными из Telegram как черновик
+      user = await this.usersService.create({
+        telegramId,
+        firstName: ctx.from.first_name || undefined,
+        lastName: ctx.from.last_name || undefined,
+        role,
+        profileCompleted: false, // Новый пользователь требует регистрации
+      });
+      this.logger.log(`New user created: ${telegramId} with role ${role}`);
+    } else {
+      // Обновляем роль существующего пользователя, если он куратор
+      if (isCurator(telegramId) && user.role !== 'CURATOR' && user.role !== 'ADMIN') {
+        user = await this.usersService.update(user.id, { role: 'CURATOR' });
+        this.logger.log(`User ${telegramId} role updated to CURATOR`);
+      }
+    }
+
+    // Проверяем, завершена ли регистрация
+    if (!user.profileCompleted) {
+      // Запускаем процесс регистрации
+      await this.startRegistrationDialog(ctx, user.id, telegramId);
+    } else {
+      // Регистрация завершена - отправляем приветствие и WebApp кнопку
+      await this.sendWelcomeWithWebApp(ctx, user.role);
+    }
+  }
+
+  /**
+   * Запуск диалога регистрации
+   */
+  private async startRegistrationDialog(ctx: Context, userId: string, telegramId: string) {
+    // Сохраняем состояние
+    this.registrationStates.set(telegramId, {
+      state: RegistrationState.WAITING_FIRST_NAME,
+      userId,
+      telegramId,
+    });
+
+    await ctx.reply(`👋 Добро пожаловать в курс «Пирамида Минто»!
+
+Для начала давайте познакомимся.
+
+📝 Пожалуйста, напишите ваше имя:`);
+  }
+
+  /**
+   * Обработка шага регистрации
+   */
+  private async handleRegistrationStep(ctx: Context, registrationData: UserRegistrationData) {
+    const text = ctx.message?.text?.trim();
+    if (!text) {
+      await ctx.reply('❌ Пожалуйста, отправьте текстовое сообщение.');
+      return;
+    }
+
+    const { state, userId, telegramId } = registrationData;
+
+    switch (state) {
+      case RegistrationState.WAITING_FIRST_NAME:
+        // Сохраняем имя
+        registrationData.firstName = text;
+        registrationData.state = RegistrationState.WAITING_LAST_NAME;
+        this.registrationStates.set(telegramId, registrationData);
+
+        await ctx.reply(`✅ Отлично, ${text}!
+
+📝 Теперь напишите вашу фамилию:`);
+        break;
+
+      case RegistrationState.WAITING_LAST_NAME:
+        // Сохраняем фамилию
+        registrationData.lastName = text;
+        registrationData.state = RegistrationState.WAITING_POSITION;
+        this.registrationStates.set(telegramId, registrationData);
+
+        await ctx.reply(`✅ Хорошо!
+
+📝 И последнее — укажите вашу должность:`);
+        break;
+
+      case RegistrationState.WAITING_POSITION:
+        // Сохраняем должность и завершаем регистрацию
+        registrationData.position = text;
+
+        // Обновляем пользователя в БД
+        const user = await this.usersService.update(userId, {
+          firstName: registrationData.firstName,
+          lastName: registrationData.lastName,
+          position: registrationData.position,
+          profileCompleted: true,
+        });
+
+        // Удаляем состояние регистрации
+        this.registrationStates.delete(telegramId);
+
+        this.logger.log(`User ${telegramId} completed registration`);
+
+        // Отправляем финальное сообщение с WebApp кнопкой
+        await ctx.reply(`✅ Регистрация завершена!
+
+Спасибо, ${user.firstName}! Теперь вы можете приступить к обучению.
+
+Нажмите кнопку ниже, чтобы открыть учебное приложение:`, {
           reply_markup: {
             inline_keyboard: [
               [
@@ -126,15 +267,27 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
             ],
           },
         });
-      } catch (error) {
-        this.logger.error('Error handling /start command:', error);
-        await ctx.reply('❌ Произошла ошибка. Попробуйте позже.');
-      }
-    });
+        break;
+    }
+  }
 
-    // Обработка callback_query для куратора (заглушка, будет реализовано позже)
-    this.bot.callbackQuery(/^curator_/, async (ctx: Context) => {
-      await ctx.answerCallbackQuery('Функция в разработке');
+  /**
+   * Отправка приветствия с WebApp кнопкой
+   */
+  private async sendWelcomeWithWebApp(ctx: Context, role: string) {
+    const welcomeMessage = this.getWelcomeMessage(role);
+
+    await ctx.reply(welcomeMessage, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: '📚 Открыть учебное приложение',
+              web_app: { url: this.tmaUrl },
+            },
+          ],
+        ],
+      },
     });
   }
 

@@ -8,6 +8,7 @@ interface CreateUserDto {
   lastName?: string;
   position?: string;
   role?: UserRole;
+  profileCompleted?: boolean;
 }
 
 @Injectable()

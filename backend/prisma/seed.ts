@@ -17,12 +17,14 @@ async function main() {
     where: { telegramId: '7017219152' },
     update: {
       role: 'ADMIN',
+      profileCompleted: true,
     },
     create: {
       telegramId: '7017219152',
       firstName: 'Ростислав',
       lastName: 'Голивец',
       role: 'ADMIN',
+      profileCompleted: true, // Профиль уже заполнен
     },
   });
 
@@ -30,12 +32,15 @@ async function main() {
     where: { telegramId: '447493564' },
     update: {
       role: 'CURATOR',
+      profileCompleted: true,
     },
     create: {
       telegramId: '447493564',
-      firstName: 'Иван',
-      lastName: 'Эдуард',
+      firstName: 'Эдуард',
+      lastName: 'Иванов',
+      position: 'Куратор',
       role: 'CURATOR',
+      profileCompleted: true, // Профиль уже заполнен
     },
   });
 

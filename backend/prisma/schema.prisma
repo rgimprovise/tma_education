@@ -12,14 +12,15 @@ datasource db {
 
 // Пользователи системы
 model User {
-  id         String   @id @default(cuid())
-  telegramId String   @unique // Telegram ID пользователя
-  firstName  String?
-  lastName   String?
-  position   String? // Должность
-  role       UserRole @default(LEARNER)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id               String   @id @default(cuid())
+  telegramId       String   @unique // Telegram ID пользователя
+  firstName        String?
+  lastName         String?
+  position         String? // Должность
+  role             UserRole @default(LEARNER)
+  profileCompleted Boolean  @default(false) // Завершена ли регистрация через бота
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   enrollments         Enrollment[]
   submissions         Submission[]
