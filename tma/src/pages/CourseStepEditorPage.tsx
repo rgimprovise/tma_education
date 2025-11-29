@@ -102,6 +102,17 @@ export function CourseStepEditorPage() {
   };
 
   const handleSave = async () => {
+    // Валидация перед отправкой
+    if (!formData.title.trim()) {
+      alert('❌ Пожалуйста, укажите название шага');
+      return;
+    }
+
+    if (!formData.content.trim()) {
+      alert('❌ Пожалуйста, укажите содержание шага');
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -110,21 +121,62 @@ export function CourseStepEditorPage() {
         ? { fields: formFields }
         : null;
 
+      // Подготовка данных для отправки
       const dataToSave = {
         ...formData,
         formSchema,
+        // Если aiRubric пустая строка, отправляем undefined
+        aiRubric: formData.aiRubric?.trim() || undefined,
       };
 
       if (isNew) {
+        // При создании отправляем всё, включая moduleId
         await api.post('/admin/course/steps', dataToSave);
       } else {
-        await api.patch(`/admin/course/steps/${stepId}`, dataToSave);
+        // При обновлении НЕ отправляем moduleId (он не должен меняться)
+        const { moduleId: _, ...updateData } = dataToSave;
+        await api.patch(`/admin/course/steps/${stepId}`, updateData);
       }
 
+      // Показываем уведомление об успехе
+      alert('✅ Шаг успешно сохранён!');
+      
+      // Возвращаемся к списку шагов
       navigate(`/curator/course/modules/${moduleId}/steps`);
     } catch (err: any) {
       console.error('Failed to save step:', err);
-      alert(err.response?.data?.message || 'Ошибка сохранения шага');
+      
+      // Формируем понятное сообщение об ошибке
+      let errorMessage = 'Неизвестная ошибка';
+      
+      if (err.response) {
+        // Ошибка от сервера
+        if (err.response.data?.message) {
+          errorMessage = Array.isArray(err.response.data.message)
+            ? err.response.data.message.join('\n')
+            : err.response.data.message;
+        } else if (err.response.data?.error) {
+          errorMessage = err.response.data.error;
+        } else if (err.response.status === 400) {
+          errorMessage = 'Некорректные данные. Проверьте все поля.';
+        } else if (err.response.status === 401) {
+          errorMessage = 'Ошибка авторизации. Перезайдите в приложение.';
+        } else if (err.response.status === 403) {
+          errorMessage = 'Недостаточно прав для этого действия.';
+        } else if (err.response.status === 404) {
+          errorMessage = 'Шаг не найден.';
+        } else if (err.response.status === 409) {
+          errorMessage = 'Конфликт данных. Возможно, шаг с таким индексом уже существует.';
+        } else if (err.response.status >= 500) {
+          errorMessage = 'Ошибка сервера. Попробуйте позже.';
+        }
+      } else if (err.request) {
+        // Запрос был отправлен, но ответа не получено
+        errorMessage = 'Нет связи с сервером. Проверьте интернет-соединение.';
+      }
+      
+      // Показываем ошибку пользователю
+      alert(`❌ Не удалось сохранить шаг:\n\n${errorMessage}`);
     } finally {
       setSaving(false);
     }
