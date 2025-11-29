@@ -20,7 +20,7 @@ export function LoginPage() {
 
       // Редирект в зависимости от роли
       if (user.role === 'CURATOR' || user.role === 'ADMIN') {
-        navigate('/curator');
+        navigate('/curator/courses'); // Стартовая страница для кураторов - дашборд курсов
       } else {
         navigate('/dashboard');
       }

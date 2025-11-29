@@ -1,0 +1,12 @@
+.curator-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f7fafc;
+}
+
+.curator-content {
+  flex: 1;
+  overflow-y: auto;
+}
+

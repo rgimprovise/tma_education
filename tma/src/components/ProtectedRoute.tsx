@@ -23,7 +23,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     // Редирект на соответствующий dashboard
     if (user.role === 'CURATOR' || user.role === 'ADMIN') {
-      return <Navigate to="/curator" replace />;
+      return <Navigate to="/curator/courses" replace />;
     }
     return <Navigate to="/dashboard" replace />;
   }

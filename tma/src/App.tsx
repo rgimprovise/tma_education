@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { CuratorLayout } from './components/CuratorLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { ModulePage } from './pages/ModulePage';
 import { StepPage } from './pages/StepPage';
 import { SubmissionsPage } from './pages/SubmissionsPage';
 import { LoginPage } from './pages/LoginPage';
 import { IncompleteProfilePage } from './pages/IncompleteProfilePage';
+import { CuratorCoursesDashboardPage } from './pages/curator/CuratorCoursesDashboardPage';
 import { CuratorDashboardPage } from './pages/CuratorDashboardPage';
 import { CuratorUserPage } from './pages/CuratorUserPage';
 import { CourseBuilderPage } from './pages/CourseBuilderPage';
@@ -88,12 +90,24 @@ function App() {
             }
           />
           
-          {/* Роуты для кураторов */}
+          {/* Роуты для кураторов - обёрнуты в CuratorLayout с табами */}
+          <Route
+            path="/curator/courses"
+            element={
+              <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
+                <CuratorLayout>
+                  <CuratorCoursesDashboardPage />
+                </CuratorLayout>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/curator"
             element={
               <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
-                <CuratorDashboardPage />
+                <CuratorLayout>
+                  <CuratorDashboardPage />
+                </CuratorLayout>
               </ProtectedRoute>
             }
           />
@@ -101,7 +115,9 @@ function App() {
             path="/curator/users/:userId"
             element={
               <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
-                <CuratorUserPage />
+                <CuratorLayout>
+                  <CuratorUserPage />
+                </CuratorLayout>
               </ProtectedRoute>
             }
           />
@@ -111,7 +127,9 @@ function App() {
             path="/curator/course"
             element={
               <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
-                <CourseBuilderPage />
+                <CuratorLayout>
+                  <CourseBuilderPage />
+                </CuratorLayout>
               </ProtectedRoute>
             }
           />
@@ -119,7 +137,9 @@ function App() {
             path="/curator/course/modules/new"
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
-                <CourseModuleEditorPage />
+                <CuratorLayout>
+                  <CourseModuleEditorPage />
+                </CuratorLayout>
               </ProtectedRoute>
             }
           />
@@ -127,7 +147,9 @@ function App() {
             path="/curator/course/modules/:moduleId"
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
-                <CourseModuleEditorPage />
+                <CuratorLayout>
+                  <CourseModuleEditorPage />
+                </CuratorLayout>
               </ProtectedRoute>
             }
           />
@@ -135,7 +157,9 @@ function App() {
             path="/curator/course/modules/:moduleId/steps"
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
-                <CourseStepsPage />
+                <CuratorLayout>
+                  <CourseStepsPage />
+                </CuratorLayout>
               </ProtectedRoute>
             }
           />
@@ -143,7 +167,9 @@ function App() {
             path="/curator/course/modules/:moduleId/steps/new"
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
-                <CourseStepEditorPage />
+                <CuratorLayout>
+                  <CourseStepEditorPage />
+                </CuratorLayout>
               </ProtectedRoute>
             }
           />
@@ -151,7 +177,9 @@ function App() {
             path="/curator/course/modules/:moduleId/steps/:stepId"
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
-                <CourseStepEditorPage />
+                <CuratorLayout>
+                  <CourseStepEditorPage />
+                </CuratorLayout>
               </ProtectedRoute>
             }
           />
