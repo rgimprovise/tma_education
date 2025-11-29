@@ -146,9 +146,11 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     // Команда /start
     this.bot.command('start', async (ctx: Context) => {
       try {
+        this.logger.log(`[/start command] Received from user ${ctx.from?.id}`);
         await this.handleStartCommand(ctx);
+        this.logger.log(`[/start command] Processed successfully for user ${ctx.from?.id}`);
       } catch (error) {
-        this.logger.error('Error handling /start command:', error);
+        this.logger.error('[/start command] Error handling /start command:', error);
         await ctx.reply('❌ Произошла ошибка. Попробуйте позже.');
       }
     });
@@ -200,17 +202,25 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
    * Обработка команды /start
    */
   private async handleStartCommand(ctx: Context) {
+    this.logger.log(`[handleStartCommand] START - Processing for user ${ctx.from?.id}`);
+    
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) {
+      this.logger.warn('[handleStartCommand] No telegramId found in context');
       await ctx.reply('❌ Не удалось определить ваш Telegram ID. Попробуйте позже.');
       return;
     }
 
+    this.logger.debug(`[handleStartCommand] TelegramId: ${telegramId}`);
+
     // Определение роли: кураторы определяются по telegram_id
     const role: UserRole = isCurator(telegramId) ? 'CURATOR' : 'LEARNER';
+    this.logger.debug(`[handleStartCommand] Detected role: ${role}`);
 
     // Поиск или создание пользователя
+    this.logger.debug(`[handleStartCommand] Looking up user by telegramId...`);
     let user = await this.usersService.findByTelegramId(telegramId);
+    this.logger.debug(`[handleStartCommand] User found: ${user ? user.id : 'null (will create)'}`);
     
     if (!user) {
       // Создаём нового пользователя с данными из Telegram как черновик
@@ -231,13 +241,19 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Проверяем, завершена ли регистрация
+    this.logger.debug(`[handleStartCommand] User profileCompleted: ${user.profileCompleted}`);
+    
     if (!user.profileCompleted) {
       // Запускаем процесс регистрации
+      this.logger.log(`[handleStartCommand] Starting registration dialog for user ${user.id}`);
       await this.startRegistrationDialog(ctx, user.id, telegramId);
     } else {
       // Регистрация завершена - отправляем приветствие и WebApp кнопку
+      this.logger.log(`[handleStartCommand] Sending welcome message with WebApp for user ${user.id} (role: ${user.role})`);
       await this.sendWelcomeWithWebApp(ctx, user.role);
     }
+    
+    this.logger.log(`[handleStartCommand] COMPLETE - Successfully processed for user ${telegramId}`);
   }
 
   /**
@@ -671,9 +687,23 @@ ${submission.curatorFeedback || 'Требуется доработка'}
     }
 
     try {
+      // Логируем входящий update для диагностики
+      this.logger.log(`[handleUpdate] Received update: ${JSON.stringify(update).substring(0, 200)}...`);
+      
+      if (update.message?.text) {
+        this.logger.log(`[handleUpdate] Message text: ${update.message.text}`);
+      }
+      
+      if (update.message?.from) {
+        this.logger.log(`[handleUpdate] From user: ${update.message.from.id} (${update.message.from.username || update.message.from.first_name})`);
+      }
+      
       await this.bot.handleUpdate(update);
+      this.logger.debug(`[handleUpdate] Update processed successfully`);
     } catch (error: any) {
-      this.logger.error('Error handling Telegram update:', error);
+      this.logger.error('[handleUpdate] Error handling Telegram update:', error);
+      this.logger.error(`[handleUpdate] Error message: ${error.message}`);
+      this.logger.error(`[handleUpdate] Error stack: ${error.stack}`);
     }
   }
 
