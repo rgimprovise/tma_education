@@ -79,9 +79,7 @@ export function CuratorDashboardPage() {
           ) : (
             learners.map((learner) => {
               const userName = `${learner.firstName || ''} ${learner.lastName || ''}`.trim() || 'Без имени';
-              const inProgressModules = learner.enrollments.filter((e) => e.status === 'IN_PROGRESS').length;
               const completedModules = learner.enrollments.filter((e) => e.status === 'COMPLETED').length;
-
               const totalModules = learner.enrollments.length;
 
               return (
