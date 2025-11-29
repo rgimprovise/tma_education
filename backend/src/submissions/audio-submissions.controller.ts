@@ -8,11 +8,17 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { IsString, IsNotEmpty } from 'class-validator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AudioSubmissionsService } from './audio-submissions.service';
 
-class StartAudioSubmissionDto {
+export class StartAudioSubmissionDto {
+  @IsString()
+  @IsNotEmpty()
   stepId: string;
+
+  @IsString()
+  @IsNotEmpty()
   moduleId: string;
 }
 
