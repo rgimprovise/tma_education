@@ -52,12 +52,6 @@ export function CourseDashboardPage() {
     }
   };
 
-  const handleModuleClick = (moduleId: string) => {
-    // Переход на просмотр модуля (в будущем - дашборд модуля)
-    // Пока можно сделать переход к шагам модуля
-    navigate(`/curator/course/modules/${moduleId}/steps`);
-  };
-
   const handleEditModule = (moduleId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     // Переход в редактор модуля
