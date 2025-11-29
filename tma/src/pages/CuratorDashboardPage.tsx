@@ -82,35 +82,44 @@ export function CuratorDashboardPage() {
               const inProgressModules = learner.enrollments.filter((e) => e.status === 'IN_PROGRESS').length;
               const completedModules = learner.enrollments.filter((e) => e.status === 'COMPLETED').length;
 
+              const totalModules = learner.enrollments.length;
+
               return (
                 <div
                   key={learner.id}
                   className="card learner-card"
                   onClick={() => navigate(`/curator/users/${learner.id}`)}
                 >
-                  <div className="card-title">{userName}</div>
-                  {learner.position && (
-                    <div className="card-subtitle">{learner.position}</div>
-                  )}
+                  <div className="learner-card-header">
+                    <div className="learner-main-info">
+                      <div className="card-title">{userName}</div>
+                      {learner.position && (
+                        <div className="card-subtitle">{learner.position}</div>
+                      )}
+                    </div>
+                    {learner.pendingSubmissions > 0 && (
+                      <div className="pending-badge">
+                        {learner.pendingSubmissions}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="learner-stats">
                     <div className="stat-item">
-                      <span className="stat-label">Модули:</span>
-                      <span className="stat-value">
-                        {completedModules} завершено, {inProgressModules} в процессе
+                      <span className="stat-icon">📖</span>
+                      <span className="stat-text">
+                        Модулей: <strong>{completedModules}/{totalModules}</strong> 
+                        {completedModules > 0 && ` (${completedModules} завершено)`}
                       </span>
                     </div>
                     <div className="stat-item">
-                      <span className="stat-label">Сдач:</span>
-                      <span className="stat-value">
-                        {learner.totalSubmissions} всего, {learner.pendingSubmissions} на проверке
+                      <span className="stat-icon">📝</span>
+                      <span className="stat-text">
+                        Сдач: <strong>{learner.totalSubmissions}</strong>
+                        {learner.pendingSubmissions > 0 && ` (${learner.pendingSubmissions} на проверке)`}
                       </span>
                     </div>
                   </div>
-                  {learner.pendingSubmissions > 0 && (
-                    <div className="pending-badge">
-                      {learner.pendingSubmissions} на проверке
-                    </div>
-                  )}
                 </div>
               );
             })
