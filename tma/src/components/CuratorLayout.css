@@ -2,7 +2,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f7fafc;
+  background: var(--color-background);
 }
 
 .curator-content {

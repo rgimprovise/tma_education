@@ -1,0 +1,89 @@
+/**
+ * Глобальные CSS переменные для темы приложения
+ * Значения устанавливаются динамически через JavaScript (applyTheme)
+ */
+
+:root {
+  /* Основные цвета */
+  --color-primary: #667eea;
+  --color-primary-soft: #edf2f7;
+  --color-primary-hover: #5568d3;
+  
+  /* Фоны */
+  --color-background: #f7fafc;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f7fafc;
+  
+  /* Текст */
+  --color-text-primary: #1a202c;
+  --color-text-secondary: #718096;
+  --color-text-on-primary: #ffffff;
+  
+  /* Границы */
+  --color-border: #e2e8f0;
+  
+  /* Статусы */
+  --color-success: #48bb78;
+  --color-warning: #ed8936;
+  --color-error: #f56565;
+  --color-info: #4299e1;
+  
+  /* Тени */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  
+  /* Радиусы */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  
+  /* Переходы */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
+}
+
+/* Глобальные стили */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Базовые утилиты для текста */
+.text-primary {
+  color: var(--color-text-primary);
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.text-on-primary {
+  color: var(--color-text-on-primary);
+}
+
+/* Базовые утилиты для фонов */
+.bg-primary {
+  background-color: var(--color-primary);
+}
+
+.bg-surface {
+  background-color: var(--color-surface);
+}
+
+.bg-background {
+  background-color: var(--color-background);
+}
+

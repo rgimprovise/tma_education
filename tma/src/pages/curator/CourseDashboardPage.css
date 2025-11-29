@@ -7,7 +7,7 @@
 .btn-back {
   background: none;
   border: none;
-  color: #667eea;
+  color: var(--color-primary);
   font-size: 16px;
   font-weight: 500;
   cursor: pointer;
@@ -16,20 +16,20 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  transition: all 0.2s;
+  transition: all var(--transition-base);
 }
 
 .btn-back:hover {
-  color: #5568d3;
+  color: var(--color-primary-hover);
   transform: translateX(-4px);
 }
 
 .course-header {
-  background: white;
-  border-radius: 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
   padding: 24px;
   margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
 }
 
 .course-header-main {
@@ -42,7 +42,7 @@
 .course-title {
   font-size: 32px;
   font-weight: 700;
-  color: #1a202c;
+  color: var(--color-text-primary);
   margin: 0;
   flex: 1;
 }
@@ -55,8 +55,8 @@
 }
 
 .course-badge {
-  background: #edf2f7;
-  color: #4a5568;
+  background: var(--color-primary-soft);
+  color: var(--color-text-secondary);
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 14px;
@@ -66,11 +66,11 @@
 
 .course-badge.exam {
   background: #fef5e7;
-  color: #d97706;
+  color: var(--color-warning);
 }
 
 .course-description {
-  color: #4a5568;
+  color: var(--color-text-secondary);
   font-size: 16px;
   line-height: 1.6;
   margin: 0;
@@ -84,10 +84,10 @@
 }
 
 .stat-card {
-  background: white;
-  border-radius: 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
   display: flex;
   gap: 16px;
   align-items: center;
@@ -105,7 +105,7 @@
 .stat-value {
   font-size: 32px;
   font-weight: 700;
-  color: #1a202c;
+  color: var(--color-text-primary);
   line-height: 1;
   margin-bottom: 8px;
 }
@@ -113,13 +113,14 @@
 .stat-label {
   font-size: 14px;
   font-weight: 500;
-  color: #718096;
+  color: var(--color-text-secondary);
   margin-bottom: 4px;
 }
 
 .stat-hint {
   font-size: 12px;
-  color: #a0aec0;
+  color: var(--color-text-secondary);
+  opacity: 0.7;
 }
 
 .actions-section, .course-info-section {
@@ -129,7 +130,7 @@
 .section-title {
   font-size: 20px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--color-text-primary);
   margin-bottom: 16px;
 }
 
@@ -140,15 +141,15 @@
 }
 
 .action-card {
-  background: white;
-  border-radius: 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
   display: flex;
   align-items: center;
   gap: 16px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-base);
   border: 2px solid transparent;
   text-align: left;
   width: 100%;
@@ -156,8 +157,8 @@
 
 .action-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  border-color: #667eea;
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-primary);
 }
 
 .action-card:active {
@@ -177,34 +178,36 @@
 .action-title {
   font-size: 18px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--color-text-primary);
   margin: 0 0 8px 0;
 }
 
 .action-description {
   font-size: 14px;
-  color: #718096;
+  color: var(--color-text-secondary);
   margin: 0;
   line-height: 1.5;
 }
 
 .action-arrow {
   font-size: 24px;
-  color: #a0aec0;
+  color: var(--color-text-secondary);
+  opacity: 0.5;
   flex-shrink: 0;
-  transition: all 0.2s;
+  transition: all var(--transition-base);
 }
 
 .action-card:hover .action-arrow {
-  color: #667eea;
+  color: var(--color-primary);
+  opacity: 1;
   transform: translateX(4px);
 }
 
 .info-grid {
-  background: white;
-  border-radius: 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
@@ -219,26 +222,26 @@
 .info-label {
   font-size: 14px;
   font-weight: 500;
-  color: #718096;
+  color: var(--color-text-secondary);
 }
 
 .info-value {
   font-size: 16px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--color-text-primary);
 }
 
 .course-dashboard .loading,
 .course-dashboard .error {
   text-align: center;
   padding: 48px 24px;
-  background: white;
-  border-radius: 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
   margin-top: 24px;
 }
 
 .course-dashboard .error {
-  color: #e53e3e;
+  color: var(--color-error);
   font-weight: 500;
 }
 

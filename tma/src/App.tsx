@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { CuratorLayout } from './components/CuratorLayout';
+import { useTheme } from './hooks/useTheme';
 import { DashboardPage } from './pages/DashboardPage';
 import { ModulePage } from './pages/ModulePage';
 import { StepPage } from './pages/StepPage';
@@ -17,10 +18,14 @@ import { CourseBuilderPage } from './pages/CourseBuilderPage';
 import { CourseModuleEditorPage } from './pages/CourseModuleEditorPage';
 import { CourseStepsPage } from './pages/CourseStepsPage';
 import { CourseStepEditorPage } from './pages/CourseStepEditorPage';
+import './theme/theme.css';
 import './App.css';
 
 function App() {
   const [isReady, setIsReady] = useState(false);
+  
+  // Инициализация темы приложения
+  useTheme();
 
   useEffect(() => {
     // Инициализация Telegram WebApp
@@ -29,9 +34,9 @@ function App() {
       tg.ready();
       tg.expand();
       
-      // Настройка темы
-      tg.setHeaderColor(tg.themeParams.bg_color || '#ffffff');
-      tg.setBackgroundColor(tg.themeParams.bg_color || '#ffffff');
+      // Настройка темы Telegram
+      tg.setHeaderColor(tg.themeParams.bg_color || '#f7fafc');
+      tg.setBackgroundColor(tg.themeParams.bg_color || '#f7fafc');
     } else {
       // Для разработки вне Telegram
       console.warn('Telegram WebApp not available. Running in dev mode.');

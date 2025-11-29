@@ -14,7 +14,7 @@
 .curator-courses-dashboard .page-title {
   font-size: 28px;
   font-weight: 700;
-  color: #1a202c;
+  color: var(--color-text-primary);
   margin: 0;
 }
 
@@ -26,19 +26,19 @@
 }
 
 .course-card {
-  background: white;
-  border-radius: 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
   border: 2px solid transparent;
 }
 
 .course-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  border-color: #667eea;
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-primary);
 }
 
 .course-card:active {
@@ -55,15 +55,15 @@
 .course-card-title {
   font-size: 18px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--color-text-primary);
   margin: 0;
   flex: 1;
   line-height: 1.4;
 }
 
 .course-card-index {
-  background: #edf2f7;
-  color: #4a5568;
+  background: var(--color-primary-soft);
+  color: var(--color-text-secondary);
   padding: 4px 12px;
   border-radius: 16px;
   font-size: 12px;
@@ -73,7 +73,7 @@
 }
 
 .course-card-description {
-  color: #4a5568;
+  color: var(--color-text-secondary);
   font-size: 14px;
   line-height: 1.5;
   margin: 0 0 16px 0;
@@ -88,7 +88,7 @@
   display: flex;
   gap: 16px;
   padding-top: 12px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--color-border);
 }
 
 .stat-item {
@@ -96,7 +96,7 @@
   align-items: center;
   gap: 6px;
   font-size: 14px;
-  color: #718096;
+  color: var(--color-text-secondary);
 }
 
 .stat-icon {
@@ -110,8 +110,8 @@
 .curator-courses-dashboard .empty-state {
   text-align: center;
   padding: 64px 24px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  border-radius: 16px;
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-lg);
   margin-top: 40px;
 }
 
@@ -123,13 +123,13 @@
 .curator-courses-dashboard .empty-state-title {
   font-size: 24px;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--color-text-primary);
   margin-bottom: 12px;
 }
 
 .curator-courses-dashboard .empty-state-description {
   font-size: 16px;
-  color: #4a5568;
+  color: var(--color-text-secondary);
   line-height: 1.6;
   margin: 0;
 }
@@ -138,21 +138,21 @@
   padding: 10px 20px;
   font-size: 16px;
   font-weight: 600;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: none;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-base);
 }
 
 .curator-courses-dashboard .btn-primary {
-  background: #667eea;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
 }
 
 .curator-courses-dashboard .btn-primary:hover {
-  background: #5568d3;
+  background: var(--color-primary-hover);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: var(--shadow-lg);
 }
 
 .curator-courses-dashboard .btn-primary:active {
