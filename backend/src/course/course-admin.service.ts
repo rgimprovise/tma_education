@@ -15,19 +15,27 @@ export class CourseAdminService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Получить список всех модулей с количеством шагов
+   * Получить список всех модулей с количеством шагов и enrollments
    */
   async findAllModules() {
-    return this.prisma.courseModule.findMany({
+    const modules = await this.prisma.courseModule.findMany({
       include: {
         _count: {
           select: {
             steps: true,
+            enrollments: true,
           },
         },
       },
       orderBy: { index: 'asc' },
     });
+
+    return modules.map((module) => ({
+      ...module,
+      stepsCount: module._count.steps,
+      enrollmentsCount: module._count.enrollments,
+      _count: undefined, // Убираем _count из ответа
+    }));
   }
 
   /**
