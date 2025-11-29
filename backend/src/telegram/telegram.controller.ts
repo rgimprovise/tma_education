@@ -17,11 +17,16 @@ export class TelegramController {
    */
   @Post('webhook')
   async handleWebhook(@Body() update: any) {
+    this.logger.log(`[POST /telegram/webhook] Received webhook request`);
+    this.logger.debug(`[POST /telegram/webhook] Update keys: ${Object.keys(update).join(', ')}`);
+    
     try {
       await this.telegramService.handleUpdate(update);
+      this.logger.debug(`[POST /telegram/webhook] Successfully processed update`);
       return { ok: true };
     } catch (error: any) {
-      this.logger.error('Error handling webhook update:', error);
+      this.logger.error('[POST /telegram/webhook] Error handling webhook update:', error);
+      this.logger.error(`[POST /telegram/webhook] Error message: ${error.message}`);
       return { ok: false, error: error.message };
     }
   }
