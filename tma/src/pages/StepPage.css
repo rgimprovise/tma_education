@@ -68,3 +68,51 @@
   margin-bottom: 8px;
 }
 
+/* Кнопка возврата к модулю */
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  margin-bottom: 16px;
+  background-color: transparent;
+  border: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+  border-radius: 8px;
+  color: var(--tg-theme-link-color, #0088cc);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-back:hover {
+  background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
+  border-color: var(--tg-theme-link-color, #0088cc);
+}
+
+/* Подсказка для учеников */
+.info-hint {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: var(--tg-theme-hint-color, rgba(0, 136, 204, 0.1));
+  border-left: 3px solid var(--tg-theme-link-color, #0088cc);
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--tg-theme-text-color, #000000);
+}
+
+/* Блоки обратной связи */
+.ai-feedback {
+  background-color: rgba(156, 39, 176, 0.05);
+  border-left: 3px solid #9c27b0;
+  padding: 12px;
+  border-radius: 4px;
+}
+
+.curator-feedback {
+  background-color: rgba(76, 175, 80, 0.05);
+  border-left: 3px solid #4caf50;
+  padding: 12px;
+  border-radius: 4px;
+}
+

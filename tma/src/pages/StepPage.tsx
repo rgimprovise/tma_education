@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 import './StepPage.css';
 
@@ -41,12 +42,15 @@ interface Step {
 export function StepPage() {
   const { stepId } = useParams<{ stepId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [step, setStep] = useState<Step | null>(null);
   const [answer, setAnswer] = useState('');
   const [formAnswers, setFormAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isLearner = user?.role === 'LEARNER';
 
   useEffect(() => {
     if (!stepId) return;
@@ -224,8 +228,16 @@ export function StepPage() {
   const hasSubmission = step.submission !== null && step.submission !== undefined;
   const isReturned = step.submission?.status === 'CURATOR_RETURNED';
 
+  const handleBackToModule = () => {
+    navigate(`/modules/${step.module.id}`);
+  };
+
   return (
     <div className="container">
+      <button className="btn-back" onClick={handleBackToModule}>
+        ← Назад к заданиям модуля
+      </button>
+
       <div className="page-header">
         <h1 className="page-title">{step.title}</h1>
       </div>
@@ -303,25 +315,42 @@ export function StepPage() {
 
           {hasSubmission && step.submission && (
             <div className="submission-info">
+              {/* Статус для всех */}
               <div className="submission-status">
-                Статус: {step.submission.status}
+                {step.submission.status === 'SENT' && '📤 Ответ отправлен, ожидает проверки'}
+                {step.submission.status === 'AI_REVIEWED' && '🤖 Предварительно проверено ИИ, ожидает куратора'}
+                {step.submission.status === 'CURATOR_APPROVED' && '✅ Одобрено куратором'}
+                {step.submission.status === 'CURATOR_RETURNED' && '🔄 Возвращено на доработку'}
               </div>
-              {step.submission.aiScore !== null && step.submission.aiScore !== undefined && (
-                <div className="feedback-block">
-                  <div className="feedback-title">Оценка ИИ: {step.submission.aiScore}/10</div>
+
+              {/* Блок ИИ - ТОЛЬКО для кураторов/админов */}
+              {!isLearner && step.submission.aiScore !== null && step.submission.aiScore !== undefined && (
+                <div className="feedback-block ai-feedback">
+                  <div className="feedback-title">🤖 Оценка ИИ: {step.submission.aiScore}/10</div>
                   {step.submission.aiFeedback && (
                     <div className="feedback-text">{step.submission.aiFeedback}</div>
                   )}
                 </div>
               )}
+
+              {/* Блок куратора - для всех */}
               {step.submission.curatorScore !== null && step.submission.curatorScore !== undefined && (
-                <div className="feedback-block">
+                <div className="feedback-block curator-feedback">
                   <div className="feedback-title">
-                    Оценка куратора: {step.submission.curatorScore}/10
+                    ✅ Оценка куратора: {step.submission.curatorScore}/10
                   </div>
                   {step.submission.curatorFeedback && (
                     <div className="feedback-text">{step.submission.curatorFeedback}</div>
                   )}
+                </div>
+              )}
+
+              {/* Для LEARNER: подсказка если ещё нет оценки куратора */}
+              {isLearner && 
+               step.submission.status !== 'CURATOR_APPROVED' && 
+               step.submission.status !== 'CURATOR_RETURNED' && (
+                <div className="info-hint">
+                  ℹ️ Ваш ответ проверяется куратором. Результат появится здесь после проверки.
                 </div>
               )}
             </div>
