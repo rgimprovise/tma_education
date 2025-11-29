@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import './CuratorTabBar.css';
 
 interface Tab {
@@ -12,6 +13,26 @@ interface Tab {
 export function CuratorTabBar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    if (window.Telegram?.WebApp) {
+      window.Telegram.WebApp.showConfirm(
+        'Вы уверены, что хотите выйти? Это очистит все данные приложения.',
+        (confirmed) => {
+          if (confirmed) {
+            logout();
+            window.location.reload();
+          }
+        }
+      );
+    } else {
+      if (confirm('Вы уверены, что хотите выйти?')) {
+        logout();
+        window.location.reload();
+      }
+    }
+  };
 
   const tabs: Tab[] = [
     {
@@ -46,15 +67,20 @@ export function CuratorTabBar() {
 
   return (
     <div className="curator-tab-bar">
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          className={`tab-button ${isActive(tab) ? 'active' : ''}`}
-          onClick={() => navigate(tab.path)}
-        >
-          {tab.label}
-        </button>
-      ))}
+      <div className="tabs-container">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            className={`tab-button ${isActive(tab) ? 'active' : ''}`}
+            onClick={() => navigate(tab.path)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <button className="logout-button" onClick={handleLogout} title="Выйти">
+        🚪
+      </button>
     </div>
   );
 }

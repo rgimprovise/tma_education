@@ -19,11 +19,30 @@ interface ModuleWithProgress {
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [modules, setModules] = useState<ModuleWithProgress[]>([]);
   const [currentModule, setCurrentModule] = useState<ModuleWithProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const handleLogout = () => {
+    if (window.Telegram?.WebApp) {
+      window.Telegram.WebApp.showConfirm(
+        'Вы уверены, что хотите выйти? Это очистит все данные приложения.',
+        (confirmed) => {
+          if (confirmed) {
+            logout();
+            window.location.reload();
+          }
+        }
+      );
+    } else {
+      if (confirm('Вы уверены, что хотите выйти?')) {
+        logout();
+        window.location.reload();
+      }
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -108,8 +127,15 @@ export function DashboardPage() {
   return (
     <div className="container">
       <div className="page-header">
-        <h1 className="page-title">Добро пожаловать, {userName}!</h1>
-        <p className="page-subtitle">Ваш прогресс по модулям</p>
+        <div className="header-content">
+          <div>
+            <h1 className="page-title">Добро пожаловать, {userName}!</h1>
+            <p className="page-subtitle">Ваш прогресс по модулям</p>
+          </div>
+          <button className="btn-logout" onClick={handleLogout} title="Выйти">
+            🚪
+          </button>
+        </div>
       </div>
 
       {!hasAccessibleModules ? (
