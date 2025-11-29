@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import { CuratorTabs } from '../components/CuratorTabs';
 import './CourseBuilderPage.css';
 
 interface CourseModule {
@@ -54,30 +53,22 @@ export function CourseBuilderPage() {
 
   if (loading) {
     return (
-      <div>
-        <CuratorTabs />
-        <div className="container">
-          <div className="loading">Загрузка...</div>
-        </div>
+      <div className="container">
+        <div className="loading">Загрузка...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div>
-        <CuratorTabs />
-        <div className="container">
-          <div className="error">{error}</div>
-        </div>
+      <div className="container">
+        <div className="error">{error}</div>
       </div>
     );
   }
 
   return (
-    <div>
-      <CuratorTabs />
-      <div className="container">
+    <div className="container">
         <div className="page-header">
           <h1 className="page-title">Конструктор курса</h1>
           <p className="page-subtitle">Управление модулями и шагами</p>
@@ -123,7 +114,6 @@ export function CourseBuilderPage() {
             ))
           )}
         </div>
-      </div>
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import { CuratorTabs } from '../components/CuratorTabs';
 import { FormSchemaBuilder } from '../components/FormSchemaBuilder';
 import './CourseStepEditorPage.css';
 
@@ -133,19 +132,14 @@ export function CourseStepEditorPage() {
 
   if (loading) {
     return (
-      <div>
-        <CuratorTabs />
-        <div className="container">
-          <div className="loading">Загрузка...</div>
-        </div>
+      <div className="container">
+        <div className="loading">Загрузка...</div>
       </div>
     );
   }
 
   return (
-    <div>
-      <CuratorTabs />
-      <div className="container">
+    <div className="container">
         <div className="page-header">
           <h1 className="page-title">
             {isNew ? 'Создать шаг' : 'Редактировать шаг'}
@@ -285,7 +279,6 @@ export function CourseStepEditorPage() {
             </button>
           </div>
         </div>
-      </div>
     </div>
   );
 }

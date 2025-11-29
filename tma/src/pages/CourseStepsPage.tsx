@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import { CuratorTabs } from '../components/CuratorTabs';
 import './CourseStepsPage.css';
 
 interface CourseStep {
@@ -80,33 +79,25 @@ export function CourseStepsPage() {
 
   if (loading) {
     return (
-      <div>
-        <CuratorTabs />
-        <div className="container">
-          <div className="loading">Загрузка...</div>
-        </div>
+      <div className="container">
+        <div className="loading">Загрузка...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div>
-        <CuratorTabs />
-        <div className="container">
-          <div className="error">{error}</div>
-          <button className="btn btn-secondary" onClick={() => navigate('/curator/course')}>
-            ← Назад
-          </button>
-        </div>
+      <div className="container">
+        <div className="error">{error}</div>
+        <button className="btn btn-secondary" onClick={() => navigate('/curator/course')}>
+          ← Назад
+        </button>
       </div>
     );
   }
 
   return (
-    <div>
-      <CuratorTabs />
-      <div className="container">
+    <div className="container">
         <div className="page-header">
           <h1 className="page-title">Шаги модуля</h1>
           <p className="page-subtitle">{moduleTitle}</p>
@@ -153,7 +144,6 @@ export function CourseStepsPage() {
         <button className="btn btn-secondary" onClick={() => navigate('/curator/course')}>
           ← Назад к модулям
         </button>
-      </div>
     </div>
   );
 }

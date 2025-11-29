@@ -22,7 +22,7 @@ export function CuratorTabBar() {
     },
     {
       id: 'learners',
-      label: '👥 Обучающиеся',
+      label: '👥 Ученики',
       path: '/curator',
       matcher: /^\/curator\/users|^\/curator$/,
       excludeMatcher: /^\/curator\/course/, // Исключаем /curator/course*

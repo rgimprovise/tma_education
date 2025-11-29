@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
-import { CuratorTabs } from '../components/CuratorTabs';
 import './CuratorDashboardPage.css';
 
 interface Learner {
@@ -65,13 +64,11 @@ export function CuratorDashboardPage() {
   }
 
   return (
-    <div>
-      <CuratorTabs />
-      <div className="container">
-        <div className="page-header">
-          <h1 className="page-title">Обучающиеся</h1>
-          <p className="page-subtitle">Добро пожаловать, {user?.firstName}!</p>
-        </div>
+    <div className="container">
+      <div className="page-header">
+        <h1 className="page-title">Ученики</h1>
+        <p className="page-subtitle">Добро пожаловать, {user?.firstName}!</p>
+      </div>
 
         <div className="learners-list">
           <h2 className="section-title">Участники ({learners.length}):</h2>
@@ -119,7 +116,6 @@ export function CuratorDashboardPage() {
             })
           )}
         </div>
-      </div>
     </div>
   );
 }
