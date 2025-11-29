@@ -175,22 +175,25 @@ export class AudioSubmissionsService {
     replyToMessageId: number,
     fileId: string,
   ): Promise<void> {
+    this.logger.log(`[processVoiceSubmission] Starting for telegramId=${telegramId}, replyTo=${replyToMessageId}, fileId=${fileId}`);
+    
     try {
       // 1. Найти пользователя
+      this.logger.debug(`[processVoiceSubmission] Looking up user by telegramId: ${telegramId}`);
       const user = await this.prisma.user.findUnique({
         where: { telegramId },
         select: { id: true, telegramId: true, firstName: true, lastName: true },
       });
-
+      
       if (!user) {
-        await this.telegramService.sendMessage(
-          telegramId,
-          '❌ Пользователь не найден в системе. Отправьте /start для регистрации.',
-        );
-        return;
+        this.logger.error(`[processVoiceSubmission] User not found: ${telegramId}`);
+        throw new Error(`User not found for telegramId: ${telegramId}`);
       }
+      
+      this.logger.debug(`[processVoiceSubmission] User found: ${user.id}`);
 
       // 2. Найти Submission по telegramPromptMessageId
+      this.logger.debug(`[processVoiceSubmission] Looking up submission by replyToMessageId: ${replyToMessageId}`);
       const submission = await this.prisma.submission.findFirst({
         where: {
           userId: user.id,
@@ -320,13 +323,20 @@ export class AudioSubmissionsService {
         }
       }
 
-      this.logger.log(`Voice submission ${submission.id} processed successfully`);
+      this.logger.log(`[processVoiceSubmission] Successfully processed voice submission ${submission.id}`);
     } catch (error: any) {
-      this.logger.error('Error processing voice submission:', error);
-      await this.telegramService.sendMessage(
-        telegramId,
-        `❌ Произошла ошибка при обработке аудио: ${error.message}`,
-      );
+      this.logger.error(`[processVoiceSubmission] Error processing voice submission for ${telegramId}:`, error);
+      this.logger.error(`[processVoiceSubmission] Error message: ${error.message}`);
+      this.logger.error(`[processVoiceSubmission] Error stack: ${error.stack}`);
+      
+      try {
+        await this.telegramService.sendMessage(
+          telegramId,
+          `❌ Произошла ошибка при обработке аудио: ${error.message}`,
+        );
+      } catch (sendError: any) {
+        this.logger.error(`[processVoiceSubmission] Failed to send error message to user:`, sendError);
+      }
     }
   }
 }

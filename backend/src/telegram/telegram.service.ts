@@ -70,10 +70,12 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       const useWebhook = this.configService.get<string>('TELEGRAM_USE_WEBHOOK') === 'true';
       
       if (useWebhook) {
-        // Webhook режим - не запускаем polling
+        // Webhook режим - инициализируем бот без polling
+        await this.bot.init();
         this.isRunning = true;
         const botInfo = await this.bot.api.getMe();
         this.logger.log(`🤖 Telegram Bot initialized (webhook mode): @${botInfo.username}`);
+        this.logger.log(`   Bot ID: ${botInfo.id}`);
         this.logger.log(`⚠️ Don't forget to set webhook URL via /telegram/set-webhook`);
       } else {
         // Polling режим (для разработки)
@@ -538,11 +540,17 @@ ${submission.curatorFeedback || 'Требуется доработка'}
    */
   private async handleVoiceMessage(ctx: Context, messageType: 'voice' | 'video_note') {
     const telegramId = ctx.from?.id.toString();
-    if (!telegramId) return;
+    if (!telegramId) {
+      this.logger.warn('Voice message received without telegramId');
+      return;
+    }
+
+    this.logger.log(`Received ${messageType} from ${telegramId}`);
 
     // Проверяем, что это reply на сообщение
     const replyToMessageId = ctx.message?.reply_to_message?.message_id;
     if (!replyToMessageId) {
+      this.logger.warn(`${messageType} from ${telegramId} is not a reply to bot message`);
       await ctx.reply(
         '⚠️ Чтобы сдать аудио-задание, отправьте голосовое сообщение **ответом (реплаем)** на инструкцию бота.',
         { parse_mode: 'Markdown' }
@@ -550,17 +558,20 @@ ${submission.curatorFeedback || 'Требуется доработка'}
       return;
     }
 
+    this.logger.log(`${messageType} is reply to message ${replyToMessageId}`);
+
     // Получаем file_id
     const fileId = messageType === 'voice' 
       ? ctx.message?.voice?.file_id 
       : ctx.message?.video_note?.file_id;
     
     if (!fileId) {
+      this.logger.error(`Failed to get file_id from ${messageType}`);
       await ctx.reply('❌ Не удалось получить аудио-файл.');
       return;
     }
 
-    this.logger.log(`Received ${messageType} from ${telegramId}, reply_to: ${replyToMessageId}, file_id: ${fileId}`);
+    this.logger.log(`Processing ${messageType} with file_id: ${fileId}`);
 
     // Отправляем подтверждение получения
     await ctx.reply('⏳ Обрабатываю ваше аудио-сообщение. Пожалуйста, подождите...');
@@ -568,16 +579,28 @@ ${submission.curatorFeedback || 'Требуется доработка'}
     // Вызываем AudioSubmissionsService для обработки
     try {
       // Ленивая инжекция через ModuleRef для избежания циклической зависимости
+      this.logger.debug('Getting AudioSubmissionsService from ModuleRef...');
       const { AudioSubmissionsService } = await import('../submissions/audio-submissions.service');
       const audioSubmissionsService = this.moduleRef.get(AudioSubmissionsService, { strict: false });
       
+      if (!audioSubmissionsService) {
+        throw new Error('AudioSubmissionsService not found in ModuleRef');
+      }
+      
+      this.logger.log(`Calling processVoiceSubmission for ${telegramId}, reply_to: ${replyToMessageId}`);
+      
       // Запускаем обработку в фоне (не блокируем обработчик)
       audioSubmissionsService.processVoiceSubmission(telegramId, replyToMessageId, fileId)
+        .then(() => {
+          this.logger.log(`Voice submission processed successfully for ${telegramId}`);
+        })
         .catch((error: Error) => {
-          this.logger.error(`Error in background voice processing: ${error.message}`);
+          this.logger.error(`Error in background voice processing for ${telegramId}:`, error);
+          this.logger.error(`Error stack: ${error.stack}`);
         });
     } catch (error: any) {
       this.logger.error(`Failed to get AudioSubmissionsService: ${error.message}`);
+      this.logger.error(`Error stack: ${error.stack}`);
       await ctx.reply('❌ Произошла ошибка. Попробуйте позже.');
     }
   }
