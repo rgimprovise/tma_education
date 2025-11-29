@@ -8,7 +8,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/guards/roles.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { SubmissionsService } from './submissions.service';
 import { ApproveSubmissionDto } from './dto/approve-submission.dto';
 import { ReturnSubmissionDto } from './dto/return-submission.dto';

@@ -1,6 +1,7 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/guards/roles.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { UsersService } from './users.service';
 import { LearnerProgressDto, LearnerDetailDto } from './dto/learner-progress.dto';
 import { UserRole } from '@prisma/client';

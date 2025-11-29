@@ -1,13 +1,7 @@
-import { Injectable, CanActivate, ExecutionContext, SetMetadata } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { UserRole } from '@prisma/client';
-
-export const ROLES_KEY = 'roles';
-
-/**
- * Декоратор для указания требуемых ролей
- */
-export const Roles = (...roles: UserRole[]) => SetMetadata(ROLES_KEY, roles);
+import { ROLES_KEY } from '../decorators/roles.decorator';
 
 /**
  * Guard для проверки ролей пользователя

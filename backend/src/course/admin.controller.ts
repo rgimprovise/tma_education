@@ -1,6 +1,7 @@
 import { Controller, Post, Param, Body, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/guards/roles.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CourseService } from './course.service';
 import { UnlockModuleDto } from './dto/unlock-module.dto';
 import { UserRole } from '@prisma/client';
