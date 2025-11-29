@@ -3,116 +3,46 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import './CourseDashboardPage.css';
 
+interface Course {
+  id: string;
+  title: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  modules: CourseModule[];
+}
+
 interface CourseModule {
   id: string;
   index: number;
   title: string;
   description?: string;
   isExam: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface CourseStats {
-  totalSteps: number;
-  requiredSteps: number;
-  moduleId: string;
-  totalLearners: number;
-  inProgressLearners: number;
-  completedLearners: number;
-  submissionsTotal: number;
-  submissionsOnReview: number;
-}
-
-interface Submission {
-  id: string;
-  user: {
-    id: string;
-    firstName?: string;
-    lastName?: string;
-  };
-  step: {
-    id: string;
-    title: string;
-    index: number;
-  };
-  status: string;
-  aiScore?: number;
-  createdAt: string;
-}
-
-interface Learner {
-  id: string;
-  firstName?: string;
-  lastName?: string;
-  enrollment: {
-    status: 'IN_PROGRESS' | 'COMPLETED';
-    progress: number;
-    totalSteps: number;
-  };
+  stepsCount: number;
+  enrollmentsCount: number;
 }
 
 export function CourseDashboardPage() {
-  const { moduleId } = useParams<{ moduleId: string }>();
+  const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
   
-  const [module, setModule] = useState<CourseModule | null>(null);
-  const [stats, setStats] = useState<CourseStats>({
-    totalSteps: 0,
-    requiredSteps: 0,
-    moduleId: '',
-    totalLearners: 0,
-    inProgressLearners: 0,
-    completedLearners: 0,
-    submissionsTotal: 0,
-    submissionsOnReview: 0,
-  });
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [learners, setLearners] = useState<Learner[]>([]);
+  const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (moduleId) {
+    if (courseId) {
       loadCourseData();
     }
-  }, [moduleId]);
+  }, [courseId]);
 
   const loadCourseData = async () => {
     try {
       setLoading(true);
       
-      // Загружаем информацию о модуле
-      const moduleResponse = await api.get(`/admin/course/modules/${moduleId}`);
-      setModule(moduleResponse.data);
-
-      // Загружаем шаги модуля для подсчёта обязательных шагов
-      const stepsResponse = await api.get(`/admin/course/modules/${moduleId}/steps`);
-      const stepsData = stepsResponse.data;
-
-      // Загружаем статистику по модулю с backend
-      const statsResponse = await api.get(`/admin/course/modules/${moduleId}/stats`);
-      const backendStats = statsResponse.data;
-
-      // Объединяем данные
-      const stats: CourseStats = {
-        totalSteps: stepsData.length,
-        requiredSteps: stepsData.filter((s: any) => s.isRequired).length,
-        moduleId: backendStats.moduleId,
-        totalLearners: backendStats.totalLearners,
-        inProgressLearners: backendStats.inProgressLearners,
-        completedLearners: backendStats.completedLearners,
-        submissionsTotal: backendStats.submissionsTotal,
-        submissionsOnReview: backendStats.submissionsOnReview,
-      };
-
-      setStats(stats);
-
-      // Загружаем submissions на проверке
-      await loadSubmissionsOnReview();
-
-      // Загружаем учеников курса
-      await loadCourseLearners();
+      // Загружаем информацию о курсе с модулями
+      const courseResponse = await api.get(`/admin/courses/${courseId}`);
+      setCourse(courseResponse.data);
     } catch (err: any) {
       console.error('Failed to load course data:', err);
       setError(err.response?.data?.message || 'Ошибка загрузки данных курса');
@@ -121,78 +51,15 @@ export function CourseDashboardPage() {
     }
   };
 
-  const loadSubmissionsOnReview = async () => {
-    try {
-      // Запрашиваем все submissions со статусом SENT или AI_REVIEWED
-      const response = await api.get('/admin/submissions', {
-        params: {
-          moduleId,
-          status: 'SENT,AI_REVIEWED',
-        },
-      });
-      // Берём последние 5
-      setSubmissions(response.data.slice(0, 5));
-    } catch (err) {
-      console.error('Failed to load submissions:', err);
-    }
-  };
-
-  const loadCourseLearners = async () => {
-    try {
-      // Запрашиваем всех learners
-      const response = await api.get('/admin/learners');
-      const allLearners = response.data;
-
-      // Фильтруем тех, у кого есть enrollment для этого модуля
-      const courseLearners = allLearners
-        .map((learner: any) => {
-          const enrollment = learner.enrollments?.find(
-            (e: any) => e.module?.id === moduleId
-          );
-          if (!enrollment) return null;
-
-          // Подсчитываем прогресс
-          const completedSteps = learner.submissions?.filter(
-            (s: any) => s.module?.id === moduleId && s.status === 'CURATOR_APPROVED'
-          ).length || 0;
-
-          return {
-            id: learner.id,
-            firstName: learner.firstName,
-            lastName: learner.lastName,
-            enrollment: {
-              status: enrollment.status,
-              progress: completedSteps,
-              totalSteps: stats.totalSteps,
-            },
-          };
-        })
-        .filter(Boolean);
-
-      setLearners(courseLearners);
-    } catch (err) {
-      console.error('Failed to load learners:', err);
-    }
-  };
-
-  const handleEditCourse = () => {
-    // Переход в редактор модуля
+  const handleModuleClick = (moduleId: string) => {
+    // В будущем: переход на дашборд модуля
+    // Пока: переход в редактор модуля
     navigate(`/curator/course/modules/${moduleId}`);
   };
 
-  const handleManageSteps = () => {
-    // Переход к списку шагов
-    navigate(`/curator/course/modules/${moduleId}/steps`);
-  };
-
-  const handleOpenSubmission = (submissionId: string) => {
-    // Переход к детальной странице submission (пока переходим к ученику)
-    navigate(`/curator/users/${submissionId}`);
-  };
-
-  const handleOpenLearner = (learnerId: string) => {
-    // Переход к карточке ученика
-    navigate(`/curator/users/${learnerId}`);
+  const handleCreateModule = () => {
+    // Переход на создание нового модуля для этого курса
+    navigate(`/curator/course/modules/new?courseId=${courseId}`);
   };
 
   const handleBackToCourses = () => {
@@ -207,7 +74,7 @@ export function CourseDashboardPage() {
     );
   }
 
-  if (error || !module) {
+  if (error || !course) {
     return (
       <div className="course-dashboard">
         <button className="btn-back" onClick={handleBackToCourses}>
@@ -218,6 +85,13 @@ export function CourseDashboardPage() {
     );
   }
 
+  // Подсчёт общей статистики по курсу
+  const totalModules = course.modules.length;
+  const totalSteps = course.modules.reduce((sum, m) => sum + m.stepsCount, 0);
+  const totalLearners = course.modules.reduce((sum, m) => sum + m.enrollmentsCount, 0);
+  // Уникальные участники (в будущем можно сделать точнее)
+  const uniqueLearners = Math.max(...course.modules.map(m => m.enrollmentsCount), 0);
+
   return (
     <div className="course-dashboard">
       <button className="btn-back" onClick={handleBackToCourses}>
@@ -227,194 +101,97 @@ export function CourseDashboardPage() {
       <div className="course-header">
         <div className="course-header-main">
           <h1 className="course-title">
-            {module.isExam ? '🎓' : '📖'} {module.title}
+            📚 {course.title}
           </h1>
-          <div className="course-meta">
-            <span className="course-badge">Модуль {module.index}</span>
-            {module.isExam && <span className="course-badge exam">Экзамен</span>}
-          </div>
         </div>
-        {module.description && (
-          <p className="course-description">{module.description}</p>
+        {course.description && (
+          <p className="course-description">{course.description}</p>
         )}
         <div className="course-header-info">
           <span className="header-info-item">
-            📝 {stats.totalSteps} {stats.totalSteps === 1 ? 'шаг' : stats.totalSteps < 5 ? 'шага' : 'шагов'}
-            {stats.requiredSteps > 0 && `, ${stats.requiredSteps} обязательных`}
+            📖 {totalModules} {totalModules === 1 ? 'модуль' : totalModules < 5 ? 'модуля' : 'модулей'}
+          </span>
+          <span className="header-info-item">
+            📝 {totalSteps} {totalSteps === 1 ? 'шаг' : totalSteps < 5 ? 'шага' : 'шагов'}
+          </span>
+          <span className="header-info-item">
+            👥 {uniqueLearners} {uniqueLearners === 1 ? 'участник' : uniqueLearners < 5 ? 'участника' : 'участников'}
           </span>
         </div>
       </div>
 
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon">📝</div>
-          <div className="stat-content">
-            <div className="stat-value">{stats.totalSteps}</div>
-            <div className="stat-label">Всего шагов</div>
-            {stats.requiredSteps > 0 && (
-              <div className="stat-hint">{stats.requiredSteps} обязательных</div>
-            )}
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon">👥</div>
-          <div className="stat-content">
-            <div className="stat-value">{stats.totalLearners}</div>
-            <div className="stat-label">Участников</div>
-            {stats.totalLearners > 0 && (
-              <div className="stat-hint">
-                {stats.inProgressLearners} в процессе, {stats.completedLearners} завершили
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon">📊</div>
-          <div className="stat-content">
-            <div className="stat-value">
-              {stats.totalLearners > 0 
-                ? `${Math.round((stats.completedLearners / stats.totalLearners) * 100)}%`
-                : '—'
-              }
-            </div>
-            <div className="stat-label">Прогресс</div>
-            <div className="stat-hint">Процент завершивших</div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon">📋</div>
-          <div className="stat-content">
-            <div className="stat-value">{stats.submissionsTotal}</div>
-            <div className="stat-label">Сдачи</div>
-            {stats.submissionsOnReview > 0 && (
-              <div className="stat-hint">
-                {stats.submissionsOnReview} на проверке
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="actions-section">
-        <h2 className="section-title">Действия</h2>
-        <div className="actions-grid">
-          <button className="action-card" onClick={handleEditCourse}>
-            <div className="action-icon">✏️</div>
-            <div className="action-content">
-              <h3 className="action-title">Редактировать курс</h3>
-              <p className="action-description">
-                Изменить название и описание курса
-              </p>
-            </div>
-            <div className="action-arrow">→</div>
-          </button>
-
-          <button className="action-card" onClick={handleManageSteps}>
-            <div className="action-icon">📝</div>
-            <div className="action-content">
-              <h3 className="action-title">Управлять шагами</h3>
-              <p className="action-description">
-                Добавить, изменить или удалить шаги курса
-              </p>
-            </div>
-            <div className="action-arrow">→</div>
+      <div className="modules-section">
+        <div className="section-header">
+          <h2 className="section-title">Модули курса</h2>
+          <button className="btn btn-secondary" onClick={handleCreateModule}>
+            ➕ Добавить модуль
           </button>
         </div>
-      </div>
 
-      {/* Блок: Нуждается в проверке */}
-      {submissions.length > 0 && (
-        <div className="submissions-section">
-          <h2 className="section-title">Нуждается в проверке</h2>
-          <div className="submissions-list">
-            {submissions.map((submission) => (
+        {course.modules.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">📖</div>
+            <h3 className="empty-state-title">Нет модулей</h3>
+            <p className="empty-state-description">
+              Добавьте первый модуль в этот курс
+            </p>
+          </div>
+        ) : (
+          <div className="modules-grid">
+            {course.modules.map((module) => (
               <div
-                key={submission.id}
-                className="submission-card"
-                onClick={() => handleOpenSubmission(submission.user.id)}
+                key={module.id}
+                className="module-card"
+                onClick={() => handleModuleClick(module.id)}
               >
-                <div className="submission-user">
-                  <div className="user-avatar">
-                    {(submission.user.firstName?.[0] || '?').toUpperCase()}
-                  </div>
-                  <div className="user-info">
-                    <div className="user-name">
-                      {submission.user.firstName || 'Без имени'} {submission.user.lastName || ''}
-                    </div>
-                    <div className="submission-step">
-                      Шаг {submission.step.index}: {submission.step.title}
-                    </div>
-                  </div>
+                <div className="module-card-header">
+                  <h3 className="module-card-title">
+                    {module.isExam ? '🎓' : '📖'} {module.title}
+                  </h3>
+                  <span className="module-card-index">Модуль {module.index}</span>
                 </div>
-                <div className="submission-status">
-                  <span className={`status-badge ${submission.status.toLowerCase()}`}>
-                    {submission.status === 'SENT' ? 'Отправлено' : 'Проверено ИИ'}
-                  </span>
-                  {submission.aiScore !== null && submission.aiScore !== undefined && (
-                    <span className="ai-score">
-                      ИИ: {submission.aiScore}/10
+
+                {module.description && (
+                  <p className="module-card-description">{module.description}</p>
+                )}
+
+                <div className="module-card-stats">
+                  <div className="stat-item">
+                    <span className="stat-icon">📝</span>
+                    <span className="stat-text">
+                      {module.stepsCount} {module.stepsCount === 1 ? 'шаг' : module.stepsCount < 5 ? 'шага' : 'шагов'}
                     </span>
-                  )}
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-icon">👥</span>
+                    <span className="stat-text">
+                      {module.enrollmentsCount} {module.enrollmentsCount === 1 ? 'участник' : module.enrollmentsCount < 5 ? 'участника' : 'участников'}
+                    </span>
+                  </div>
                 </div>
-                <div className="submission-arrow">→</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Блок: Ученики курса */}
-      {learners.length > 0 && (
-        <div className="learners-section">
-          <h2 className="section-title">Ученики курса</h2>
-          <div className="learners-list">
-            {learners.map((learner) => (
-              <div
-                key={learner.id}
-                className="learner-card"
-                onClick={() => handleOpenLearner(learner.id)}
-              >
-                <div className="learner-info">
-                  <div className="learner-avatar">
-                    {(learner.firstName?.[0] || '?').toUpperCase()}
-                  </div>
-                  <div className="learner-details">
-                    <div className="learner-name">
-                      {learner.firstName || 'Без имени'} {learner.lastName || ''}
-                    </div>
-                    <div className="learner-progress">
-                      Прогресс: {learner.enrollment.progress}/{learner.enrollment.totalSteps} шагов
-                    </div>
-                  </div>
-                </div>
-                <div className="learner-status">
-                  <span className={`status-badge ${learner.enrollment.status.toLowerCase()}`}>
-                    {learner.enrollment.status === 'IN_PROGRESS' ? 'В процессе' : 'Завершил'}
-                  </span>
-                </div>
-                <div className="learner-arrow">→</div>
+                {module.isExam && (
+                  <div className="module-badge exam-badge">Экзамен</div>
+                )}
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="course-info-section">
-        <h2 className="section-title">Дополнительная информация</h2>
+        <h2 className="section-title">Информация о курсе</h2>
         <div className="info-grid">
           <div className="info-item">
             <span className="info-label">Создан:</span>
             <span className="info-value">
-              {new Date(module.createdAt).toLocaleDateString('ru-RU')}
+              {new Date(course.createdAt).toLocaleDateString('ru-RU')}
             </span>
           </div>
           <div className="info-item">
             <span className="info-label">Обновлён:</span>
             <span className="info-value">
-              {new Date(module.updatedAt).toLocaleDateString('ru-RU')}
+              {new Date(course.updatedAt).toLocaleDateString('ru-RU')}
             </span>
           </div>
         </div>

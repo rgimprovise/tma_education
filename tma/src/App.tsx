@@ -108,21 +108,11 @@ function App() {
             }
           />
           <Route
-            path="/curator/courses/:moduleId"
+            path="/curator/courses/:courseId"
             element={
               <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
                 <CuratorLayout>
                   <CourseDashboardPage />
-                </CuratorLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/curator/courses/:moduleId/learners"
-            element={
-              <ProtectedRoute allowedRoles={['CURATOR', 'ADMIN']}>
-                <CuratorLayout>
-                  <CuratorDashboardPage />
                 </CuratorLayout>
               </ProtectedRoute>
             }
