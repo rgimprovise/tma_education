@@ -344,13 +344,23 @@ export class SubmissionsService {
       }
     }
 
+    // Подготавливаем данные для обновления
+    const updateData: any = {
+      status,
+      curatorScore,
+      curatorFeedback,
+    };
+
+    // Если возвращаем на доработку или одобряем - сбрасываем запрос на повторную отправку
+    // (запрос выполнен: куратор разрешил пересдачу)
+    if (status === 'CURATOR_RETURNED' || status === 'CURATOR_APPROVED') {
+      updateData.resubmissionRequested = false;
+      updateData.resubmissionRequestedAt = null;
+    }
+
     const updated = await this.prisma.submission.update({
       where: { id },
-      data: {
-        status,
-        curatorScore,
-        curatorFeedback,
-      },
+      data: updateData,
       include: {
         step: {
           select: {
