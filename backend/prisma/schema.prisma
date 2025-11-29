@@ -150,6 +150,8 @@ model Submission {
   resubmissionRequested   Boolean   @default(false) // Ученик запросил повторную отправку
   resubmissionRequestedAt DateTime? // Когда запрошена повторная отправка
 
+  telegramPromptMessageId Int? // ID сообщения бота с инструкцией для аудио-сдачи
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

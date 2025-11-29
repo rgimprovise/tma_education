@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setToken(null);
     setUser(null);
-    localStorage.clear(); // Очищаем всё, включая telegram_id
+    localStorage.removeItem('token');
     delete api.defaults.headers.common['Authorization'];
   };
 
