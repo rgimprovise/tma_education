@@ -298,10 +298,8 @@ export class AudioSubmissionsService {
         },
       });
 
-      // 7. Уведомить ученика
-      const learnerMessage = submission.step.requiresAiReview
-        ? `✅ Аудио принято и обработано!\n\n📊 Предварительная оценка ИИ: ${aiScore}/${submission.step.maxScore}\n\n💬 Комментарий:\n${aiFeedback}\n\n⏳ Ваш ответ отправлен куратору на проверку.`
-        : `✅ Аудио принято!\n\n⏳ Ваш ответ отправлен куратору на проверку.`;
+      // 7. Уведомить ученика (БЕЗ AI оценки - она только для куратора)
+      const learnerMessage = `✅ Аудио принято и обработано!\n\n⏳ Ваш ответ отправлен куратору на проверку. Результат появится после проверки куратором.`;
 
       await this.telegramService.sendMessage(user.telegramId!, learnerMessage);
 
@@ -329,14 +327,63 @@ export class AudioSubmissionsService {
       this.logger.error(`[processVoiceSubmission] Error message: ${error.message}`);
       this.logger.error(`[processVoiceSubmission] Error stack: ${error.stack}`);
       
+      // Отправляем ученику общее сообщение об ошибке (БЕЗ технических деталей)
       try {
         await this.telegramService.sendMessage(
           telegramId,
-          `❌ Произошла ошибка при обработке аудио: ${error.message}`,
+          `❌ Произошла ошибка при обработке аудио.\n\nПопробуйте отправить ответ заново или обратитесь к куратору.`,
         );
       } catch (sendError: any) {
         this.logger.error(`[processVoiceSubmission] Failed to send error message to user:`, sendError);
       }
+    }
+  }
+
+  /**
+   * Получить аудио-файл из Telegram для воспроизведения куратором
+   * @param fileId - Telegram file_id
+   * @returns Buffer с аудио + metadata
+   */
+  async getAudioFile(fileId: string): Promise<{
+    buffer: Buffer;
+    mimeType: string;
+    filename: string;
+  }> {
+    this.logger.log(`[getAudioFile] Downloading file: ${fileId}`);
+
+    try {
+      // Получить URL файла из Telegram
+      const fileUrl = await this.telegramService.getFileUrl(fileId);
+      
+      // Скачать файл
+      const response = await fetch(fileUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.statusText}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      
+      // Определить MIME type по file_id или расширению
+      // Telegram voice - обычно ogg/opus, video_note - mp4
+      const mimeType = fileUrl.includes('.mp4') 
+        ? 'video/mp4' 
+        : 'audio/ogg';
+      
+      const filename = fileUrl.includes('.mp4') 
+        ? `audio_${Date.now()}.mp4` 
+        : `audio_${Date.now()}.ogg`;
+      
+      this.logger.log(`[getAudioFile] File downloaded: ${buffer.length} bytes, mimeType: ${mimeType}`);
+      
+      return {
+        buffer,
+        mimeType,
+        filename,
+      };
+    } catch (error: any) {
+      this.logger.error(`[getAudioFile] Error downloading file ${fileId}:`, error);
+      throw new Error(`Failed to get audio file: ${error.message}`);
     }
   }
 }

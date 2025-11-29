@@ -253,11 +253,39 @@ export function CuratorSubmissionPage() {
 
     // Файл/аудио/видео
     if (submission.answerFileId) {
+      const isAudioVideo = submission.answerType === 'AUDIO' || submission.answerType === 'VIDEO';
+      const audioUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/audio-submissions/play/${submission.answerFileId}`;
+      
       return (
         <div className="answer-file">
-          <p>Тип ответа: {submission.answerType}</p>
-          <p>File ID: <code>{submission.answerFileId}</code></p>
-          <p className="hint">Для просмотра файла обратитесь к Telegram API или боту</p>
+          <div className="answer-type-badge">
+            {submission.answerType === 'AUDIO' ? '🎤 Голосовое сообщение' :
+             submission.answerType === 'VIDEO' ? '📹 Видео-кружок' :
+             `📎 Файл (${submission.answerType})`}
+          </div>
+          
+          {isAudioVideo && submission.answerText && (
+            <div className="transcription-block">
+              <div className="transcription-title">📝 Транскрипт:</div>
+              <div className="transcription-text">{submission.answerText}</div>
+            </div>
+          )}
+          
+          {isAudioVideo && (
+            <button
+              className="btn btn-play-audio"
+              onClick={() => window.open(audioUrl, '_blank')}
+            >
+              🎧 Прослушать аудио
+            </button>
+          )}
+          
+          {!isAudioVideo && (
+            <div className="file-info">
+              <p>File ID: <code>{submission.answerFileId}</code></p>
+              <p className="hint">Для просмотра файла обратитесь к Telegram API</p>
+            </div>
+          )}
         </div>
       );
     }
