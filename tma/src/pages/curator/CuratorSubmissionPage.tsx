@@ -218,7 +218,7 @@ export function CuratorSubmissionPage() {
 
     try {
       setProcessing(true);
-      const response = await api.post(`/audio-submissions/${submission.id}/send-to-me`);
+      await api.post(`/audio-submissions/${submission.id}/send-to-me`);
 
       if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.showAlert('🎧 Аудио отправлено вам в чат с ботом');
