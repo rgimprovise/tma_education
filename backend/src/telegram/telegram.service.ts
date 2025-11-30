@@ -1329,9 +1329,10 @@ ${submission.curatorFeedback || 'Требуется доработка'}
       this.logger.log('[handleQuestionMessage] Searching for curators...');
       const curators = await this.prisma.user.findMany({
         where: {
-          role: {
-            in: [UserRole.CURATOR, UserRole.ADMIN],
-          },
+          OR: [
+            { role: UserRole.CURATOR },
+            { role: UserRole.ADMIN },
+          ],
           telegramId: {
             not: null,
           },
