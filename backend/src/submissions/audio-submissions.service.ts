@@ -307,13 +307,13 @@ export class AudioSubmissionsService {
       const curators = await this.prisma.user.findMany({
         where: {
           role: { in: ['CURATOR', 'ADMIN'] },
-          telegramId: { not: null },
         },
         select: { telegramId: true },
       });
 
+      // Фильтруем кураторов с telegramId и уведомляем
       for (const curator of curators) {
-        if (curator.telegramId) {
+        if (curator.telegramId && curator.telegramId !== null) {
           await this.telegramService.notifyCuratorAboutSubmission(
             curator.telegramId,
             updatedSubmission,

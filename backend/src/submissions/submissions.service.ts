@@ -524,14 +524,14 @@ export class SubmissionsService {
     const curators = await this.prisma.user.findMany({
       where: {
         role: { in: ['CURATOR', 'ADMIN'] },
-        telegramId: { not: null },
       },
       select: { telegramId: true },
     });
 
     // Отправляем уведомления асинхронно (не блокируем ответ)
+    // Фильтруем кураторов с telegramId
     curators.forEach((curator) => {
-      if (curator.telegramId) {
+      if (curator.telegramId && curator.telegramId !== null) {
         this.telegramService
           .sendMessage(curator.telegramId, notificationText)
           .catch((error) => {
