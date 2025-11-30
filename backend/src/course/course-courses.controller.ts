@@ -60,23 +60,14 @@ export class CourseCoursesController {
    * Возвращает полноценный HTML-документ с отчётом по курсу,
    * который можно открыть в браузере или в Telegram как .html файл.
    * 
-   * Поддерживает два способа авторизации:
-   * 1. Bearer token в заголовке (стандартный)
-   * 2. Временный токен в query параметре ?token=... (для прямого открытия)
-   * 
    * Пример запроса:
    * GET /admin/courses/{courseId}/report/html
-   * GET /admin/courses/{courseId}/report/html?token={temporaryToken}
    * 
    * Ответ: HTML-документ с отчётом
    */
   @Get(':courseId/report/html')
   @Roles(UserRole.CURATOR, UserRole.ADMIN)
-  async getCourseReport(
-    @Param('courseId') courseId: string,
-    @Request() req: any,
-    @Res() res: Response,
-  ) {
+  async getCourseReport(@Param('courseId') courseId: string, @Res() res: Response) {
     const report = await this.courseReportService.buildCourseReport(courseId);
     const html = buildCourseReportHtml(report);
     

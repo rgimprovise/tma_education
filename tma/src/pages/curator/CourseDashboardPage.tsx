@@ -181,75 +181,6 @@ export function CourseDashboardPage() {
     navigate('/curator/courses');
   };
 
-  const handleOpenReport = async () => {
-    if (!courseId) return;
-
-    try {
-      // Получаем токен для авторизации
-      const token = localStorage.getItem('token');
-      if (!token) {
-        if (window.Telegram?.WebApp) {
-          window.Telegram.WebApp.showAlert('❌ Необходима авторизация');
-        } else {
-          alert('Необходима авторизация');
-        }
-        return;
-      }
-
-      // Формируем URL для отчёта
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const reportUrl = `${apiUrl}/admin/courses/${courseId}/report/html`;
-      
-      // Сначала пытаемся открыть в новой вкладке через прямой URL с токеном
-      const reportUrlWithToken = `${reportUrl}?token=${encodeURIComponent(token)}`;
-      const newWindow = window.open(reportUrlWithToken, '_blank');
-      
-      // Всегда также скачиваем файл для надёжности
-      try {
-        const response = await fetch(reportUrl, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`Ошибка загрузки отчёта: ${response.status} ${response.statusText}`);
-        }
-
-        const html = await response.text();
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        const dateStr = new Date().toISOString().split('T')[0];
-        link.download = `отчет_курс_${dateStr}.html`;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        if (window.Telegram?.WebApp) {
-          window.Telegram.WebApp.showAlert('✅ Отчёт скачан. Файл сохранён в загрузках.');
-        }
-      } catch (downloadErr: any) {
-        console.error('Failed to download report:', downloadErr);
-        // Если скачивание не удалось, но окно открылось - это ОК
-        if (!newWindow) {
-          throw downloadErr;
-        }
-      }
-    } catch (err: any) {
-      console.error('Failed to load report:', err);
-      const errorMessage = err.message || 'Неизвестная ошибка';
-      if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert(`❌ Ошибка загрузки отчёта: ${errorMessage}`);
-      } else {
-        alert(`❌ Ошибка загрузки отчёта: ${errorMessage}`);
-      }
-    }
-  };
-
   const handleSendReportToTelegram = async () => {
     if (!courseId) return;
 
@@ -388,22 +319,10 @@ export function CourseDashboardPage() {
         </div>
       </div>
 
-      {/* Кнопки для работы с отчётом */}
-      <div className="actions-section" style={{ marginBottom: '24px', display: 'flex', gap: '12px', flexDirection: 'column' }}>
+      {/* Кнопка для отправки отчёта в Telegram */}
+      <div className="actions-section" style={{ marginBottom: '24px' }}>
         <button 
           className="btn btn-primary" 
-          onClick={handleOpenReport}
-          style={{ 
-            width: '100%',
-            padding: '12px 20px',
-            fontSize: '16px',
-            fontWeight: '600',
-          }}
-        >
-          📊 Скачать отчёт по курсу
-        </button>
-        <button 
-          className="btn btn-secondary" 
           onClick={handleSendReportToTelegram}
           style={{ 
             width: '100%',
