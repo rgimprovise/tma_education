@@ -487,6 +487,17 @@ export class CourseService {
       }),
     );
 
+    // КРИТИЧЕСКИ ВАЖНО: Если модуль открывается "для всех", устанавливаем флаг autoUnlockForNewLearners = true
+    // Это гарантирует, что новые регистрирующиеся ученики автоматически получат доступ к модулю
+    if (forAll) {
+      await this.prisma.courseModule.update({
+        where: { id: moduleId },
+        data: {
+          autoUnlockForNewLearners: true,
+        },
+      });
+    }
+
     // Отправляем уведомления пользователям об открытии модуля
     const userMap = new Map(users.map((u) => [u.id, u]));
     results.forEach((enrollment) => {
@@ -502,7 +513,7 @@ export class CourseService {
 
     return {
       unlocked: results.length,
-      message: `Module unlocked for ${results.length} user(s)`,
+      message: `Module unlocked for ${results.length} user(s)${forAll ? ' and will be automatically unlocked for new learners' : ''}`,
     };
   }
 
@@ -580,6 +591,17 @@ export class CourseService {
     );
 
     const lockedCount = results.filter((id) => id !== null).length;
+
+    // КРИТИЧЕСКИ ВАЖНО: Если модуль блокируется "для всех", сбрасываем флаг autoUnlockForNewLearners = false
+    // Это гарантирует, что новые регистрирующиеся ученики НЕ получат доступ к заблокированному модулю
+    if (forAll) {
+      await this.prisma.courseModule.update({
+        where: { id: moduleId },
+        data: {
+          autoUnlockForNewLearners: false,
+        },
+      });
+    }
 
     // Отправляем уведомления пользователям о блокировке модуля
     const userMap = new Map(users.map((u) => [u.id, u]));
