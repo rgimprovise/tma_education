@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 
@@ -220,6 +220,33 @@ export class UsersService {
       recentSubmissions,
       statistics,
     };
+  }
+
+  /**
+   * Удалить пользователя (для куратора)
+   * Удаляет пользователя и все связанные данные (enrollments, submissions)
+   * @param userId - ID пользователя для удаления
+   */
+  async deleteUser(userId: string): Promise<void> {
+    // Проверяем, что пользователь существует
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Запрещаем удаление кураторов и админов
+    if (user.role === 'CURATOR' || user.role === 'ADMIN') {
+      throw new BadRequestException('Cannot delete curator or admin users');
+    }
+
+    // Удаляем пользователя (каскадное удаление enrollments и submissions через Prisma)
+    await this.prisma.user.delete({
+      where: { id: userId },
+    });
   }
 }
 

@@ -4,6 +4,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CourseService } from './course.service';
 import { UnlockModuleDto } from './dto/unlock-module.dto';
+import { LockModuleDto } from './dto/lock-module.dto';
 import { UserRole } from '@prisma/client';
 
 /**
@@ -33,6 +34,28 @@ export class CourseAdminController {
       moduleId,
       dto.userIds || [],
       dto.allCompletedPrevious || false,
+      dto.forAll || false,
+      req.user.id,
+    );
+  }
+
+  /**
+   * POST /admin/modules/:moduleId/lock
+   * Заблокировать модуль для пользователей
+   * Принимает:
+   *  - userIds: список конкретных пользователей
+   *  - forAll: для всех зарегистрированных учеников
+   */
+  @Post(':moduleId/lock')
+  @Roles(UserRole.CURATOR, UserRole.ADMIN)
+  async lockModule(
+    @Param('moduleId') moduleId: string,
+    @Body() dto: LockModuleDto,
+    @Request() req,
+  ) {
+    return this.courseService.lockModuleForUsers(
+      moduleId,
+      dto.userIds || [],
       dto.forAll || false,
       req.user.id,
     );

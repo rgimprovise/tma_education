@@ -219,9 +219,42 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       }
     });
 
-    // Обработка callback_query для куратора (заглушка, будет реализовано позже)
+    // Обработка callback_query для куратора (одобрение/возврат сдачи)
     this.bot.callbackQuery(/^curator_/, async (ctx: Context) => {
-      await ctx.answerCallbackQuery('Функция в разработке');
+      try {
+        const callbackData = ctx.callbackQuery?.data;
+        if (!callbackData) {
+          await ctx.answerCallbackQuery('Ошибка: нет данных');
+          return;
+        }
+
+        const telegramId = ctx.from?.id.toString();
+        if (!telegramId) {
+          await ctx.answerCallbackQuery('Ошибка: не удалось определить пользователя');
+          return;
+        }
+
+        // Проверяем, что пользователь - куратор
+        const user = await this.usersService.findByTelegramId(telegramId);
+        if (!user || (user.role !== 'CURATOR' && user.role !== 'ADMIN')) {
+          await ctx.answerCallbackQuery('❌ Доступ запрещён. Только кураторы могут проверять работы.');
+          return;
+        }
+
+        // Парсим callback_data
+        if (callbackData.startsWith('curator_approve_')) {
+          const submissionId = callbackData.replace('curator_approve_', '');
+          await this.handleApproveSubmission(ctx, submissionId, user.id);
+        } else if (callbackData.startsWith('curator_return_')) {
+          const submissionId = callbackData.replace('curator_return_', '');
+          await this.handleReturnSubmission(ctx, submissionId, user.id);
+        } else {
+          await ctx.answerCallbackQuery('Неизвестная команда');
+        }
+      } catch (error: any) {
+        this.logger.error('Error handling callback query:', error);
+        await ctx.answerCallbackQuery('❌ Произошла ошибка. Попробуйте позже.');
+      }
     });
   }
 
@@ -658,6 +691,36 @@ ${submission.curatorFeedback || 'Требуется доработка'}
   }
 
   /**
+   * Отправить уведомление о блокировке модуля
+   * @param learnerTelegramId - Telegram ID обучающегося
+   * @param moduleIndex - Индекс модуля
+   * @param moduleTitle - Название модуля
+   */
+  async notifyModuleLocked(
+    learnerTelegramId: string,
+    moduleIndex: number,
+    moduleTitle: string,
+  ): Promise<void> {
+    const message = `🔒 Модуль заблокирован
+
+📚 Модуль ${moduleIndex}: "${moduleTitle}"
+
+Доступ к этому модулю временно закрыт куратором.
+
+Обратитесь к куратору для получения доступа.`;
+
+    await this.sendMessage(learnerTelegramId, message, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            this.getAppInlineButton(),
+          ],
+        ],
+      },
+    });
+  }
+
+  /**
    * Обработка голосовых сообщений и видео-заметок (для аудио-сдачи)
    * @param ctx - Контекст сообщения grammY
    * @param messageType - Тип сообщения ('voice' или 'video_note')
@@ -839,6 +902,141 @@ ${submission.curatorFeedback || 'Требуется доработка'}
         ],
       },
     });
+  }
+
+  /**
+   * Обработать одобрение сдачи через callback-кнопку
+   */
+  private async handleApproveSubmission(ctx: Context, submissionId: string, curatorId: string) {
+    try {
+      // Lazy load SubmissionsService
+      const { SubmissionsService } = await import('../submissions/submissions.service');
+      const submissionsService = this.moduleRef.get(SubmissionsService, { strict: false });
+
+      if (!submissionsService) {
+        await ctx.answerCallbackQuery('❌ Ошибка: сервис недоступен');
+        return;
+      }
+
+      // Получаем submission для проверки
+      const submission = await submissionsService.findById(submissionId);
+      if (!submission) {
+        await ctx.answerCallbackQuery('❌ Сдача не найдена');
+        return;
+      }
+
+      // Проверяем, что куратор имеет доступ
+      // (в будущем можно добавить проверку прав)
+
+      // Одобряем сдачу (используем максимальный балл по умолчанию, если не указан)
+      const maxScore = submission.step?.maxScore || 10;
+      const curatorScore = maxScore; // По умолчанию максимальный балл при одобрении через кнопку
+
+      await submissionsService.updateStatus(
+        submissionId,
+        'CURATOR_APPROVED',
+        curatorScore,
+        'Одобрено куратором через Telegram',
+      );
+
+      // Обновляем сообщение в Telegram
+      const message = ctx.callbackQuery?.message;
+      if (message && 'message_id' in message) {
+        const userName = `${submission.user?.firstName || ''} ${submission.user?.lastName || ''}`.trim() || 'Участник';
+        const updatedText = `✅ Сдача одобрена куратором
+
+👤 Участник: ${userName}
+📚 Модуль: ${submission.module?.index || '?'}
+📝 Шаг: ${submission.step?.index || '?'}
+
+⭐ Оценка: ${curatorScore}/${maxScore}
+💬 Комментарий: Одобрено куратором через Telegram`;
+
+        try {
+          await ctx.api.editMessageText(message.chat.id, message.message_id, updatedText, {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  this.getAppInlineButton(),
+                ],
+              ],
+            },
+          });
+        } catch (editError: any) {
+          this.logger.warn('Failed to edit message:', editError);
+          // Не критично, продолжаем
+        }
+      }
+
+      await ctx.answerCallbackQuery('✅ Сдача одобрена!');
+    } catch (error: any) {
+      this.logger.error('Error handling approve submission:', error);
+      await ctx.answerCallbackQuery('❌ Ошибка при одобрении сдачи');
+    }
+  }
+
+  /**
+   * Обработать возврат сдачи на доработку через callback-кнопку
+   */
+  private async handleReturnSubmission(ctx: Context, submissionId: string, curatorId: string) {
+    try {
+      // Lazy load SubmissionsService
+      const { SubmissionsService } = await import('../submissions/submissions.service');
+      const submissionsService = this.moduleRef.get(SubmissionsService, { strict: false });
+
+      if (!submissionsService) {
+        await ctx.answerCallbackQuery('❌ Ошибка: сервис недоступен');
+        return;
+      }
+
+      // Получаем submission для проверки
+      const submission = await submissionsService.findById(submissionId);
+      if (!submission) {
+        await ctx.answerCallbackQuery('❌ Сдача не найдена');
+        return;
+      }
+
+      // Возвращаем сдачу на доработку
+      await submissionsService.updateStatus(
+        submissionId,
+        'CURATOR_RETURNED',
+        undefined,
+        'Возвращено на доработку куратором через Telegram. Пожалуйста, доработайте и отправьте снова.',
+      );
+
+      // Обновляем сообщение в Telegram
+      const message = ctx.callbackQuery?.message;
+      if (message && 'message_id' in message) {
+        const userName = `${submission.user?.firstName || ''} ${submission.user?.lastName || ''}`.trim() || 'Участник';
+        const updatedText = `↩️ Сдача возвращена на доработку
+
+👤 Участник: ${userName}
+📚 Модуль: ${submission.module?.index || '?'}
+📝 Шаг: ${submission.step?.index || '?'}
+
+💬 Комментарий: Возвращено на доработку куратором через Telegram. Пожалуйста, доработайте и отправьте снова.`;
+
+        try {
+          await ctx.api.editMessageText(message.chat.id, message.message_id, updatedText, {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  this.getAppInlineButton(),
+                ],
+              ],
+            },
+          });
+        } catch (editError: any) {
+          this.logger.warn('Failed to edit message:', editError);
+          // Не критично, продолжаем
+        }
+      }
+
+      await ctx.answerCallbackQuery('↩️ Сдача возвращена на доработку');
+    } catch (error: any) {
+      this.logger.error('Error handling return submission:', error);
+      await ctx.answerCallbackQuery('❌ Ошибка при возврате сдачи');
+    }
   }
 
   /**

@@ -505,5 +505,101 @@ export class CourseService {
       message: `Module unlocked for ${results.length} user(s)`,
     };
   }
+
+  /**
+   * Заблокировать модуль для пользователей (для куратора)
+   * Удаляет Enrollment для указанных пользователей или переводит в LOCKED
+   */
+  async lockModuleForUsers(
+    moduleId: string,
+    userIds: string[],
+    forAll: boolean,
+    curatorId: string,
+  ): Promise<{ locked: number; message: string }> {
+    // Проверяем, что модуль существует
+    const module = await this.prisma.courseModule.findUnique({
+      where: { id: moduleId },
+    });
+
+    if (!module) {
+      throw new NotFoundException('Module not found');
+    }
+
+    let targetUserIds: string[] = [];
+
+    if (forAll) {
+      // Блокируем для всех зарегистрированных учеников
+      const allLearners = await this.prisma.user.findMany({
+        where: { role: 'LEARNER' },
+        select: { id: true },
+      });
+      targetUserIds = allLearners.map((u) => u.id);
+    } else {
+      targetUserIds = userIds;
+    }
+
+    if (targetUserIds.length === 0) {
+      return {
+        locked: 0,
+        message: 'No users to lock module for',
+      };
+    }
+
+    // Получаем информацию о пользователях для уведомлений
+    const users = await this.prisma.user.findMany({
+      where: {
+        id: {
+          in: targetUserIds,
+        },
+      },
+      select: {
+        id: true,
+        telegramId: true,
+      },
+    });
+
+    // Удаляем Enrollment для каждого пользователя
+    const results = await Promise.all(
+      targetUserIds.map(async (userId) => {
+        const existing = await this.prisma.enrollment.findFirst({
+          where: {
+            userId,
+            moduleId,
+          },
+        });
+
+        if (existing) {
+          // Удаляем Enrollment (модуль становится LOCKED)
+          await this.prisma.enrollment.delete({
+            where: { id: existing.id },
+          });
+          return userId;
+        }
+        return null;
+      }),
+    );
+
+    const lockedCount = results.filter((id) => id !== null).length;
+
+    // Отправляем уведомления пользователям о блокировке модуля
+    const userMap = new Map(users.map((u) => [u.id, u]));
+    results.forEach((userId) => {
+      if (userId) {
+        const user = userMap.get(userId);
+        if (user && user.telegramId) {
+          this.telegramService
+            .notifyModuleLocked(user.telegramId, module.index, module.title)
+            .catch((error) => {
+              console.error(`Failed to notify user ${user.telegramId}:`, error);
+            });
+        }
+      }
+    });
+
+    return {
+      locked: lockedCount,
+      message: `Module locked for ${lockedCount} user(s)`,
+    };
+  }
 }
 

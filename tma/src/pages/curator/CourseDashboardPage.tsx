@@ -30,6 +30,7 @@ export function CourseDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [unlockingModuleId, setUnlockingModuleId] = useState<string | null>(null);
+  const [lockingModuleId, setLockingModuleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (courseId) {
@@ -76,15 +77,62 @@ export function CourseDashboardPage() {
         forAll: true,
       });
 
-      alert(response.data.message || `Модуль открыт для ${response.data.unlocked} учеников`);
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(
+          response.data.message || `Модуль открыт для ${response.data.unlocked} учеников`
+        );
+      } else {
+        alert(response.data.message || `Модуль открыт для ${response.data.unlocked} учеников`);
+      }
       
       // Обновляем данные курса чтобы увидеть новое количество enrollments
       await loadCourseData();
     } catch (err: any) {
       console.error('Failed to unlock module:', err);
-      alert(err.response?.data?.message || 'Ошибка при открытии модуля');
+      const errorMessage = err.response?.data?.message || 'Ошибка при открытии модуля';
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`❌ ${errorMessage}`);
+      } else {
+        alert(`❌ ${errorMessage}`);
+      }
     } finally {
       setUnlockingModuleId(null);
+    }
+  };
+
+  const handleLockModule = async (moduleId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Не открывать карточку модуля
+
+    if (!confirm('Заблокировать этот модуль для всех учеников? Все enrollments будут удалены.')) {
+      return;
+    }
+
+    try {
+      setLockingModuleId(moduleId);
+      const response = await api.post(`/admin/modules/${moduleId}/lock`, {
+        forAll: true,
+      });
+
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(
+          response.data.message || `Модуль заблокирован для ${response.data.locked} учеников`
+        );
+      } else {
+        alert(response.data.message || `Модуль заблокирован для ${response.data.locked} учеников`);
+      }
+      
+      // Обновляем данные курса
+      await loadCourseData();
+    } catch (err: any) {
+      console.error('Failed to lock module:', err);
+      const errorMessage = err.response?.data?.message || 'Ошибка при блокировке модуля';
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`❌ ${errorMessage}`);
+      } else {
+        alert(`❌ ${errorMessage}`);
+      }
+    } finally {
+      setLockingModuleId(null);
     }
   };
 
@@ -280,13 +328,23 @@ export function CourseDashboardPage() {
                 </div>
 
                 <div className="module-card-actions">
-                  <button
-                    className="btn-unlock"
-                    onClick={(e) => handleUnlockModule(module.id, e)}
-                    disabled={unlockingModuleId === module.id}
-                  >
-                    {unlockingModuleId === module.id ? '🔄 Открываю...' : '🔓 Открыть для всех'}
-                  </button>
+                  {module.enrollmentsCount > 0 ? (
+                    <button
+                      className="btn-lock"
+                      onClick={(e) => handleLockModule(module.id, e)}
+                      disabled={lockingModuleId === module.id}
+                    >
+                      {lockingModuleId === module.id ? '🔄 Блокирую...' : '🔒 Заблокировать'}
+                    </button>
+                  ) : (
+                    <button
+                      className="btn-unlock"
+                      onClick={(e) => handleUnlockModule(module.id, e)}
+                      disabled={unlockingModuleId === module.id}
+                    >
+                      {unlockingModuleId === module.id ? '🔄 Открываю...' : '🔓 Открыть для всех'}
+                    </button>
+                  )}
                   <button
                     className="btn-edit"
                     onClick={(e) => handleEditModule(module.id, e)}

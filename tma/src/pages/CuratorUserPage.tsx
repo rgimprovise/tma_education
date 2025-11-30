@@ -67,6 +67,7 @@ export function CuratorUserPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -148,6 +149,55 @@ export function CuratorUserPage() {
     }
   };
 
+  const handleDeleteUser = async () => {
+    if (!userId || !learner) return;
+
+    const userName = `${learner.firstName || ''} ${learner.lastName || ''}`.trim() || 'Ученик';
+    const confirmMessage = 
+      `Удалить пользователя?\n\n` +
+      `Имя: ${userName}\n` +
+      `Telegram ID: ${learner.telegramId}\n\n` +
+      `Будут удалены:\n` +
+      `- Все enrollments (прогресс по модулям)\n` +
+      `- Все submissions (сдачи заданий)\n\n` +
+      `Это действие нельзя отменить!`;
+
+    const confirmed = window.Telegram?.WebApp 
+      ? await new Promise<boolean>((resolve) => {
+          window.Telegram?.WebApp?.showConfirm(confirmMessage, (result) => {
+            resolve(result);
+          });
+        })
+      : window.confirm(confirmMessage);
+
+    if (!confirmed) return;
+
+    try {
+      setDeleting(true);
+      await api.delete(`/admin/users/${userId}`);
+
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert('✅ Пользователь удалён', () => {
+          navigate('/curator');
+        });
+      } else {
+        alert('✅ Пользователь удалён');
+        navigate('/curator');
+      }
+    } catch (err: any) {
+      console.error('Failed to delete user:', err);
+      const errorMessage = err.response?.data?.message || 'Ошибка при удалении пользователя';
+      
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`❌ ${errorMessage}`);
+      } else {
+        alert(`❌ ${errorMessage}`);
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container">
@@ -172,10 +222,19 @@ export function CuratorUserPage() {
   return (
     <div className="container">
       <div className="page-header">
-        <h1 className="page-title">{userName}</h1>
-        {learner.position && (
-          <p className="page-subtitle">{learner.position}</p>
-        )}
+        <div>
+          <h1 className="page-title">{userName}</h1>
+          {learner.position && (
+            <p className="page-subtitle">{learner.position}</p>
+          )}
+        </div>
+        <button
+          className="btn btn-danger"
+          onClick={handleDeleteUser}
+          disabled={deleting}
+        >
+          {deleting ? '🔄 Удаляю...' : '🗑️ Удалить пользователя'}
+        </button>
       </div>
 
       {/* Статистика */}

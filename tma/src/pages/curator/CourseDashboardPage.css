@@ -674,6 +674,7 @@
 }
 
 .btn-unlock,
+.btn-lock,
 .btn-edit {
   flex: 1;
   padding: 10px 16px;
@@ -706,6 +707,30 @@
 }
 
 .btn-unlock:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.btn-lock {
+  border: 2px solid #dc2626;
+  background: var(--color-surface);
+  color: #dc2626;
+}
+
+.btn-lock:hover:not(:disabled) {
+  background: #dc2626;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-lock:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-lock:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   border-color: var(--color-border);

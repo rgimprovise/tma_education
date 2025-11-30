@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Delete, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -32,6 +32,17 @@ export class AdminController {
   @Roles(UserRole.CURATOR, UserRole.ADMIN)
   async getLearnerDetail(@Param('id') id: string): Promise<LearnerDetailDto> {
     return this.usersService.getLearnerDetail(id);
+  }
+
+  /**
+   * DELETE /admin/users/:id
+   * Удалить пользователя (только для LEARNER, нельзя удалять кураторов/админов)
+   */
+  @Delete('users/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles(UserRole.CURATOR, UserRole.ADMIN)
+  async deleteUser(@Param('id') id: string): Promise<void> {
+    await this.usersService.deleteUser(id);
   }
 }
 
