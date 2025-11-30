@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ModuleRef } from '@nestjs/core';
 import { Bot, Context, InputFile } from 'grammy';
 import { UsersService } from '../users/users.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { isCurator } from '../users/curators.config';
 import { UserRole } from '@prisma/client';
 
@@ -13,6 +14,13 @@ enum RegistrationState {
   WAITING_FIRST_NAME = 'WAITING_FIRST_NAME',
   WAITING_LAST_NAME = 'WAITING_LAST_NAME',
   WAITING_POSITION = 'WAITING_POSITION',
+}
+
+/**
+ * Состояния для вопросов куратору
+ */
+enum QuestionState {
+  WAITING_QUESTION = 'WAITING_QUESTION',
 }
 
 /**
@@ -28,6 +36,15 @@ interface UserRegistrationData {
 }
 
 /**
+ * Данные состояния ожидания вопроса от ученика
+ */
+interface UserQuestionData {
+  state: QuestionState;
+  userId: string;
+  telegramId: string;
+}
+
+/**
  * TelegramService - сервис для работы с Telegram Bot
  * Использует библиотеку grammY
  */
@@ -40,10 +57,18 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   
   // Хранилище состояний регистрации пользователей (telegramId -> RegistrationData)
   private registrationStates: Map<string, UserRegistrationData> = new Map();
+  
+  // Хранилище состояний ожидания вопроса от учеников (telegramId -> QuestionData)
+  private questionStates: Map<string, UserQuestionData> = new Map();
+  
+  // Хранилище соответствий сообщений куратора и ученика (messageId куратора -> telegramId ученика)
+  // Используется для обработки reply от куратора
+  private curatorReplyMap: Map<number, string> = new Map();
 
   constructor(
     private configService: ConfigService,
     private usersService: UsersService,
+    private prisma: PrismaService,
     private moduleRef: ModuleRef,
   ) {
     const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
@@ -188,10 +213,30 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           return;
         }
 
+        // Обработка кнопки "Задать вопрос куратору"
+        if (text === '❓ Задать вопрос куратору') {
+          await this.handleAskQuestionButton(ctx, telegramId);
+          return;
+        }
+
+        // Проверяем, находится ли пользователь в процессе ожидания вопроса
+        const questionData = this.questionStates.get(telegramId);
+        if (questionData) {
+          await this.handleQuestionMessage(ctx, questionData);
+          return;
+        }
+
         // Проверяем, находится ли пользователь в процессе регистрации
         const registrationData = this.registrationStates.get(telegramId);
         if (registrationData) {
           await this.handleRegistrationStep(ctx, registrationData);
+          return;
+        }
+
+        // Обработка reply от куратора (ответ на вопрос ученика)
+        if (ctx.message?.reply_to_message) {
+          await this.handleCuratorReply(ctx, telegramId);
+          return;
         }
       } catch (error) {
         this.logger.error('Error handling text message:', error);
@@ -420,7 +465,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
 
         // Отправляем reply-клавиатуру для постоянного доступа
         await ctx.reply('💡 Вы всегда можете открыть приложение, нажав кнопку ниже:', {
-          reply_markup: this.getAppReplyKeyboard(),
+          reply_markup: this.getAppReplyKeyboard(user.role),
         });
         break;
     }
@@ -444,7 +489,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
 
     // Отправляем reply-клавиатуру отдельным сообщением для постоянного отображения
     await ctx.reply('💡 Вы всегда можете открыть приложение, нажав кнопку ниже:', {
-      reply_markup: this.getAppReplyKeyboard(),
+      reply_markup: this.getAppReplyKeyboard(role),
     });
   }
 
@@ -474,15 +519,26 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
    * Получить reply-клавиатуру с кнопкой "Открыть приложение"
    * Используется для постоянной клавиатуры в чате
    */
-  private getAppReplyKeyboard() {
-    return {
-      keyboard: [
-        [
-          {
-            text: '📚 Открыть приложение',
-          },
-        ],
+  private getAppReplyKeyboard(role?: string) {
+    const keyboard: any[] = [
+      [
+        {
+          text: '📚 Открыть приложение',
+        },
       ],
+    ];
+
+    // Для учеников добавляем кнопку "Задать вопрос куратору"
+    if (role === 'LEARNER') {
+      keyboard.push([
+        {
+          text: '❓ Задать вопрос куратору',
+        },
+      ]);
+    }
+
+    return {
+      keyboard,
       resize_keyboard: true,
       one_time_keyboard: false, // Клавиатура всегда видна
     };
@@ -1195,6 +1251,166 @@ ${submission.curatorFeedback || 'Требуется доработка'}
     } catch (error: any) {
       this.logger.error('Failed to delete webhook:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Обработка нажатия кнопки "Задать вопрос куратору"
+   */
+  private async handleAskQuestionButton(ctx: Context, telegramId: string) {
+    const user = await this.usersService.findByTelegramId(telegramId);
+    if (!user) {
+      await ctx.reply('❌ Пользователь не найден. Отправьте /start для регистрации.');
+      return;
+    }
+
+    if (!user.profileCompleted) {
+      await ctx.reply('⚠️ Завершите регистрацию, отправив /start');
+      return;
+    }
+
+    if (user.role !== 'LEARNER') {
+      await ctx.reply('❌ Эта функция доступна только для учеников.');
+      return;
+    }
+
+    // Устанавливаем состояние ожидания вопроса
+    this.questionStates.set(telegramId, {
+      state: QuestionState.WAITING_QUESTION,
+      userId: user.id,
+      telegramId,
+    });
+
+    await ctx.reply('📝 Пожалуйста, напишите ваше сообщение для куратора:');
+  }
+
+  /**
+   * Обработка сообщения с вопросом от ученика
+   */
+  private async handleQuestionMessage(ctx: Context, questionData: UserQuestionData) {
+    const text = ctx.message?.text?.trim();
+    if (!text) {
+      await ctx.reply('❌ Пожалуйста, отправьте текстовое сообщение.');
+      return;
+    }
+
+    // Получаем информацию об ученике
+    const user = await this.usersService.findByTelegramId(questionData.telegramId);
+    if (!user) {
+      await ctx.reply('❌ Пользователь не найден.');
+      this.questionStates.delete(questionData.telegramId);
+      return;
+    }
+
+    // Формируем информацию об отправителе
+    const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Ученик';
+    const userInfo = [
+      `👤 От: ${userName}`,
+      user.position ? `💼 Должность: ${user.position}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const messageToCurator = `❓ Вопрос от ученика\n\n${userInfo}\n\n📝 Сообщение:\n${text}`;
+
+    try {
+      // Находим всех кураторов
+      const curators = await this.prisma.user.findMany({
+        where: {
+          role: {
+            in: ['CURATOR', 'ADMIN'],
+          },
+          telegramId: {
+            not: null,
+          },
+        },
+        select: {
+          telegramId: true,
+        },
+      });
+
+      if (curators.length === 0) {
+        await ctx.reply('❌ К сожалению, сейчас нет доступных кураторов. Попробуйте позже.');
+        this.questionStates.delete(questionData.telegramId);
+        return;
+      }
+
+      // Отправляем сообщение каждому куратору
+      const sentMessages = await Promise.all(
+        curators.map(async (curator) => {
+          if (!curator.telegramId) return null;
+          
+          try {
+            const sentMessage = await this.sendMessage(curator.telegramId, messageToCurator);
+            
+            // Сохраняем соответствие messageId куратора и telegramId ученика для обработки reply
+            if (sentMessage?.message_id) {
+              this.curatorReplyMap.set(sentMessage.message_id, questionData.telegramId);
+            }
+            
+            return sentMessage;
+          } catch (error) {
+            this.logger.error(`Failed to send question to curator ${curator.telegramId}:`, error);
+            return null;
+          }
+        }),
+      );
+
+      // Удаляем состояние ожидания вопроса
+      this.questionStates.delete(questionData.telegramId);
+
+      // Подтверждаем ученику
+      await ctx.reply('✅ Ваше сообщение успешно отправлено куратору. Ответ придет в этом чате.');
+    } catch (error) {
+      this.logger.error('Error handling question message:', error);
+      await ctx.reply('❌ Произошла ошибка при отправке сообщения. Попробуйте позже.');
+      this.questionStates.delete(questionData.telegramId);
+    }
+  }
+
+  /**
+   * Обработка reply от куратора (ответ на вопрос ученика)
+   */
+  private async handleCuratorReply(ctx: Context, curatorTelegramId: string) {
+    const replyToMessage = ctx.message?.reply_to_message;
+    if (!replyToMessage) {
+      return; // Не reply сообщение
+    }
+
+    const replyToMessageId = replyToMessage.message_id;
+    const learnerTelegramId = this.curatorReplyMap.get(replyToMessageId);
+
+    if (!learnerTelegramId) {
+      // Это не reply на вопрос ученика, игнорируем
+      return;
+    }
+
+    // Проверяем, что отправитель - куратор
+    const curator = await this.usersService.findByTelegramId(curatorTelegramId);
+    if (!curator || (curator.role !== 'CURATOR' && curator.role !== 'ADMIN')) {
+      await ctx.reply('❌ Только кураторы могут отвечать на вопросы учеников.');
+      return;
+    }
+
+    const replyText = ctx.message?.text?.trim();
+    if (!replyText) {
+      await ctx.reply('❌ Пожалуйста, отправьте текстовое сообщение.');
+      return;
+    }
+
+    // Формируем ответ для ученика
+    const curatorName = `${curator.firstName || ''} ${curator.lastName || ''}`.trim() || 'Куратор';
+    const messageToLearner = `💬 Ответ от куратора ${curatorName}:\n\n${replyText}`;
+
+    try {
+      // Отправляем ответ ученику
+      await this.sendMessage(learnerTelegramId, messageToLearner);
+      
+      // Подтверждаем куратору
+      await ctx.reply('✅ Ваш ответ отправлен ученику.');
+    } catch (error) {
+      this.logger.error(`Failed to send reply to learner ${learnerTelegramId}:`, error);
+      await ctx.reply('❌ Произошла ошибка при отправке ответа. Попробуйте позже.');
     }
   }
 

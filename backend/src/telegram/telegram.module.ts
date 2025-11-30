@@ -2,10 +2,12 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TelegramService } from './telegram.service';
 import { TelegramController } from './telegram.controller';
 import { UsersModule } from '../users/users.module';
+import { DatabaseModule } from '../prisma/prisma.module';
 
 @Module({
   imports: [
     UsersModule,
+    DatabaseModule, // Для доступа к PrismaService
     // forwardRef для избежания циклической зависимости
     // (TelegramModule -> SubmissionsModule -> TelegramModule)
     // SubmissionsModule будет импортирован динамически в TelegramService
