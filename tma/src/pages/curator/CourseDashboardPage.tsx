@@ -209,7 +209,7 @@ export function CourseDashboardPage() {
 
       const html = await response.text();
       
-      // Создаём blob URL и скачиваем файл (работает везде, включая десктоп)
+      // Скачиваем файл (работает везде)
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -221,12 +221,26 @@ export function CourseDashboardPage() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      // Также открываем в новой вкладке через data URL (работает везде)
-      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
-      window.open(dataUrl, '_blank');
+      // Открываем в новой вкладке через прямой URL к эндпоинту
+      // Создаём временную форму для отправки POST с токеном, или используем прямой переход
+      // Проще всего - открыть в той же вкладке через прямой URL
+      // Но для этого нужен токен в URL, что небезопасно
+      // Вместо этого - просто открываем data URL в новой вкладке
+      // Если это не работает, пользователь может открыть скачанный файл
+      try {
+        const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+        const newWindow = window.open();
+        if (newWindow) {
+          newWindow.document.write(html);
+          newWindow.document.close();
+        }
+      } catch (e) {
+        // Если не удалось открыть, просто скачиваем файл
+        console.log('Could not open in new window, file downloaded instead');
+      }
       
       if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert('✅ Отчёт скачан и открыт в новой вкладке.');
+        window.Telegram.WebApp.showAlert('✅ Отчёт скачан. Файл сохранён в загрузках.');
       }
     } catch (err: any) {
       console.error('Failed to load report:', err);
