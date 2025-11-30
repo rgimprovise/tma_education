@@ -1,10 +1,11 @@
-import { Controller, Post, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Param, Body, UseGuards, Request, Patch } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CourseService } from './course.service';
 import { UnlockModuleDto } from './dto/unlock-module.dto';
 import { LockModuleDto } from './dto/lock-module.dto';
+import { SetAutoUnlockDto } from './dto/set-auto-unlock.dto';
 import { UserRole } from '@prisma/client';
 
 /**
@@ -59,6 +60,21 @@ export class CourseAdminController {
       dto.forAll || false,
       req.user.id,
     );
+  }
+
+  /**
+   * PATCH /admin/modules/:moduleId/auto-unlock
+   * Установить флаг автоматического открытия модуля для новых учеников
+   * Принимает:
+   *  - autoUnlock: true = открывать для новых, false = не открывать
+   */
+  @Patch(':moduleId/auto-unlock')
+  @Roles(UserRole.CURATOR, UserRole.ADMIN)
+  async setAutoUnlock(
+    @Param('moduleId') moduleId: string,
+    @Body() dto: SetAutoUnlockDto,
+  ) {
+    return this.courseService.setAutoUnlockForNewLearners(moduleId, dto.autoUnlock);
   }
 }
 

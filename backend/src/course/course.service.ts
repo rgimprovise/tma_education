@@ -601,5 +601,90 @@ export class CourseService {
       message: `Module locked for ${lockedCount} user(s)`,
     };
   }
+
+  /**
+   * Установить флаг автоматического открытия модуля для новых учеников
+   * @param moduleId - ID модуля
+   * @param autoUnlock - true = открывать для новых, false = не открывать
+   */
+  async setAutoUnlockForNewLearners(
+    moduleId: string,
+    autoUnlock: boolean,
+  ): Promise<{ message: string }> {
+    const module = await this.prisma.courseModule.findUnique({
+      where: { id: moduleId },
+    });
+
+    if (!module) {
+      throw new NotFoundException('Module not found');
+    }
+
+    await this.prisma.courseModule.update({
+      where: { id: moduleId },
+      data: {
+        autoUnlockForNewLearners: autoUnlock,
+      },
+    });
+
+    return {
+      message: autoUnlock
+        ? 'Модуль будет автоматически открываться для новых учеников'
+        : 'Автоматическое открытие модуля для новых учеников отключено',
+    };
+  }
+
+  /**
+   * Открыть модуль для нового ученика (если модуль имеет autoUnlockForNewLearners = true)
+   * Вызывается при создании нового пользователя с ролью LEARNER
+   * @param userId - ID нового ученика
+   */
+  async autoUnlockModulesForNewLearner(userId: string): Promise<void> {
+    // Находим все модули с autoUnlockForNewLearners = true
+    const autoUnlockModules = await this.prisma.courseModule.findMany({
+      where: {
+        autoUnlockForNewLearners: true,
+      },
+      select: {
+        id: true,
+        index: true,
+        title: true,
+      },
+    });
+
+    if (autoUnlockModules.length === 0) {
+      return; // Нет модулей для автоматического открытия
+    }
+
+    // Создаём Enrollment для каждого модуля
+    const enrollments = await Promise.all(
+      autoUnlockModules.map((module) =>
+        this.prisma.enrollment.create({
+          data: {
+            userId,
+            moduleId: module.id,
+            status: 'IN_PROGRESS',
+            unlockedAt: new Date(),
+            // unlockedById не устанавливаем, так как это автоматическое открытие
+          },
+        }),
+      ),
+    );
+
+    // Отправляем уведомления пользователю
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { telegramId: true },
+    });
+
+    if (user && user.telegramId) {
+      // Уведомляем о первом открытом модуле (обычно это модуль 1)
+      const firstModule = autoUnlockModules[0];
+      this.telegramService
+        .notifyModuleUnlocked(user.telegramId, firstModule.index, firstModule.title)
+        .catch((error) => {
+          console.error(`Failed to notify user ${user.telegramId} about auto-unlocked module:`, error);
+        });
+    }
+  }
 }
 

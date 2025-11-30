@@ -20,6 +20,7 @@ interface CourseModule {
   isExam: boolean;
   stepsCount: number;
   enrollmentsCount: number;
+  autoUnlockForNewLearners?: boolean;
 }
 
 export function CourseDashboardPage() {
@@ -31,6 +32,7 @@ export function CourseDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [unlockingModuleId, setUnlockingModuleId] = useState<string | null>(null);
   const [lockingModuleId, setLockingModuleId] = useState<string | null>(null);
+  const [settingAutoUnlock, setSettingAutoUnlock] = useState<string | null>(null);
 
   useEffect(() => {
     if (courseId) {
@@ -133,6 +135,45 @@ export function CourseDashboardPage() {
       }
     } finally {
       setLockingModuleId(null);
+    }
+  };
+
+  const handleToggleAutoUnlock = async (moduleId: string, currentValue: boolean, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    const newValue = !currentValue;
+    const confirmMessage = newValue
+      ? 'Включить автоматическое открытие этого модуля для новых учеников?\n\nНовые ученики будут автоматически получать доступ к этому модулю при регистрации.'
+      : 'Отключить автоматическое открытие этого модуля для новых учеников?\n\nНовые ученики больше не будут автоматически получать доступ к этому модулю.';
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      setSettingAutoUnlock(moduleId);
+      const response = await api.patch(`/admin/modules/${moduleId}/auto-unlock`, {
+        autoUnlock: newValue,
+      });
+
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(response.data.message || 'Настройка сохранена');
+      } else {
+        alert(response.data.message || 'Настройка сохранена');
+      }
+
+      // Обновляем данные курса
+      await loadCourseData();
+    } catch (err: any) {
+      console.error('Failed to set auto-unlock:', err);
+      const errorMessage = err.response?.data?.message || 'Ошибка при сохранении настройки';
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`❌ ${errorMessage}`);
+      } else {
+        alert(`❌ ${errorMessage}`);
+      }
+    } finally {
+      setSettingAutoUnlock(null);
     }
   };
 
@@ -328,28 +369,41 @@ export function CourseDashboardPage() {
                 </div>
 
                 <div className="module-card-actions">
-                  {module.enrollmentsCount > 0 ? (
+                  <div className="module-actions-row">
+                    {module.enrollmentsCount > 0 ? (
+                      <button
+                        className="btn-lock"
+                        onClick={(e) => handleLockModule(module.id, e)}
+                        disabled={lockingModuleId === module.id}
+                      >
+                        {lockingModuleId === module.id ? '🔄 Блокирую...' : '🔒 Заблокировать'}
+                      </button>
+                    ) : (
+                      <button
+                        className="btn-unlock"
+                        onClick={(e) => handleUnlockModule(module.id, e)}
+                        disabled={unlockingModuleId === module.id}
+                      >
+                        {unlockingModuleId === module.id ? '🔄 Открываю...' : '🔓 Открыть для всех'}
+                      </button>
+                    )}
                     <button
-                      className="btn-lock"
-                      onClick={(e) => handleLockModule(module.id, e)}
-                      disabled={lockingModuleId === module.id}
+                      className="btn-edit"
+                      onClick={(e) => handleEditModule(module.id, e)}
                     >
-                      {lockingModuleId === module.id ? '🔄 Блокирую...' : '🔒 Заблокировать'}
+                      ✏️ Редактировать
                     </button>
-                  ) : (
-                    <button
-                      className="btn-unlock"
-                      onClick={(e) => handleUnlockModule(module.id, e)}
-                      disabled={unlockingModuleId === module.id}
-                    >
-                      {unlockingModuleId === module.id ? '🔄 Открываю...' : '🔓 Открыть для всех'}
-                    </button>
-                  )}
+                  </div>
                   <button
-                    className="btn-edit"
-                    onClick={(e) => handleEditModule(module.id, e)}
+                    className={`btn-auto-unlock ${module.autoUnlockForNewLearners ? 'active' : ''}`}
+                    onClick={(e) => handleToggleAutoUnlock(module.id, module.autoUnlockForNewLearners || false, e)}
+                    disabled={settingAutoUnlock === module.id}
                   >
-                    ✏️ Редактировать
+                    {settingAutoUnlock === module.id
+                      ? '🔄 Сохраняю...'
+                      : module.autoUnlockForNewLearners
+                      ? '✅ Открывать для новых учеников'
+                      : '➕ Открывать для новых учеников'}
                   </button>
                 </div>
               </div>
