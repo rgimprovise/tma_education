@@ -1330,7 +1330,7 @@ ${submission.curatorFeedback || 'Требуется доработка'}
       const curators = await this.prisma.user.findMany({
         where: {
           role: {
-            in: ['CURATOR', 'ADMIN'],
+            in: [UserRole.CURATOR, UserRole.ADMIN],
           },
           telegramId: {
             not: null,
@@ -1411,7 +1411,7 @@ ${submission.curatorFeedback || 'Требуется доработка'}
 
     // Проверяем, что отправитель - куратор
     const curator = await this.usersService.findByTelegramId(curatorTelegramId);
-    if (!curator || (curator.role !== 'CURATOR' && curator.role !== 'ADMIN')) {
+    if (!curator || (curator.role !== UserRole.CURATOR && curator.role !== UserRole.ADMIN)) {
       await ctx.reply('❌ Только кураторы могут отвечать на вопросы учеников.');
       return;
     }
