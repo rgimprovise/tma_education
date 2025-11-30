@@ -213,6 +213,32 @@ export function CuratorSubmissionPage() {
     }
   };
 
+  const handleSendAudioToMe = async () => {
+    if (!submission) return;
+
+    try {
+      setProcessing(true);
+      const response = await api.post(`/audio-submissions/${submission.id}/send-to-me`);
+
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert('🎧 Аудио отправлено вам в чат с ботом');
+      } else {
+        alert('🎧 Аудио отправлено вам в чат с ботом');
+      }
+    } catch (err: any) {
+      console.error('Failed to send audio:', err);
+      const errorMessage = err.response?.data?.message || 'Ошибка при отправке аудио';
+      
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`❌ ${errorMessage}`);
+      } else {
+        alert(`❌ ${errorMessage}`);
+      }
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const renderAnswerContent = () => {
     if (!submission) return null;
 
@@ -220,7 +246,6 @@ export function CuratorSubmissionPage() {
     // Потому что у аудио ЕСТЬ и answerText (транскрипция) и answerFileId
     if (submission.answerFileId) {
       const isAudioVideo = submission.answerType === 'AUDIO' || submission.answerType === 'VIDEO';
-      const audioUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/audio-submissions/play/${submission.answerFileId}`;
       
       return (
         <div className="answer-file">
@@ -240,7 +265,8 @@ export function CuratorSubmissionPage() {
           {isAudioVideo && (
             <button
               className="btn btn-play-audio"
-              onClick={() => window.open(audioUrl, '_blank')}
+              onClick={handleSendAudioToMe}
+              disabled={processing}
             >
               🎧 Прослушать аудио
             </button>

@@ -76,5 +76,22 @@ export class AudioSubmissionsController {
     
     return new StreamableFile(audioData.buffer);
   }
+
+  /**
+   * POST /audio-submissions/:submissionId/send-to-me
+   * Отправить аудио куратору в Telegram-чат
+   */
+  @Post(':submissionId/send-to-me')
+  @UseGuards(RolesGuard)
+  @Roles('CURATOR', 'ADMIN')
+  async sendAudioToMe(
+    @Param('submissionId') submissionId: string,
+    @Request() req,
+  ) {
+    return this.audioSubmissionsService.sendAudioToCurator(
+      submissionId,
+      req.user.id,
+    );
+  }
 }
 

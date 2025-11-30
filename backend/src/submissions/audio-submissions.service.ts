@@ -386,5 +386,85 @@ export class AudioSubmissionsService {
       throw new Error(`Failed to get audio file: ${error.message}`);
     }
   }
+
+  /**
+   * Отправить аудио куратору в Telegram-чат
+   * @param submissionId - ID сдачи
+   * @param curatorId - ID куратора (текущий пользователь)
+   */
+  async sendAudioToCurator(submissionId: string, curatorId: string) {
+    this.logger.log(`[sendAudioToCurator] Sending audio for submission ${submissionId} to curator ${curatorId}`);
+
+    // 1. Получить куратора
+    const curator = await this.prisma.user.findUnique({
+      where: { id: curatorId },
+      select: { id: true, telegramId: true, firstName: true },
+    });
+
+    if (!curator || !curator.telegramId) {
+      throw new BadRequestException('Curator not found or has no Telegram ID');
+    }
+
+    // 2. Получить submission с answerFileId
+    const submission = await this.prisma.submission.findUnique({
+      where: { id: submissionId },
+      select: {
+        id: true,
+        answerFileId: true,
+        answerType: true,
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+        step: {
+          select: {
+            title: true,
+            index: true,
+          },
+        },
+        module: {
+          select: {
+            title: true,
+            index: true,
+          },
+        },
+      },
+    });
+
+    if (!submission) {
+      throw new NotFoundException('Submission not found');
+    }
+
+    if (!submission.answerFileId) {
+      throw new BadRequestException('This submission has no audio file');
+    }
+
+    // 3. Отправить аудио в Telegram
+    const caption = 
+      `🎤 Голосовое сообщение ученика\n\n` +
+      `👤 Ученик: ${submission.user.firstName} ${submission.user.lastName}\n` +
+      `📚 Модуль ${submission.module.index}: ${submission.module.title}\n` +
+      `📝 Задание ${submission.step.index}: ${submission.step.title}`;
+
+    try {
+      await this.telegramService.sendVoice(
+        curator.telegramId,
+        submission.answerFileId,
+        caption,
+      );
+
+      this.logger.log(`[sendAudioToCurator] Audio sent successfully to curator ${curatorId}`);
+
+      return {
+        success: true,
+        message: 'Аудио отправлено вам в чат с ботом',
+      };
+    } catch (error: any) {
+      this.logger.error(`[sendAudioToCurator] Error sending voice:`, error);
+      throw new BadRequestException('Failed to send audio to Telegram');
+    }
+  }
 }
 

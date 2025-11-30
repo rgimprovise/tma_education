@@ -413,6 +413,30 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Отправить голосовое сообщение пользователю
+   * @param telegramId - Telegram ID пользователя
+   * @param fileId - Telegram file_id аудио
+   * @param caption - Подпись к аудио (опционально)
+   */
+  async sendVoice(telegramId: string, fileId: string, caption?: string): Promise<any> {
+    if (!this.bot || !this.isRunning) {
+      this.logger.warn('Bot is not running. Cannot send voice.');
+      throw new Error('Bot is not running');
+    }
+
+    try {
+      const sentMessage = await this.bot.api.sendVoice(telegramId, fileId, {
+        caption,
+      });
+      this.logger.debug(`Voice sent to ${telegramId}, message_id: ${sentMessage.message_id}`);
+      return sentMessage;
+    } catch (error: any) {
+      this.logger.error(`Failed to send voice to ${telegramId}:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Отправить уведомление куратору о новой сдаче
    * @param curatorTelegramId - Telegram ID куратора
    * @param submission - Данные о сдаче
