@@ -256,12 +256,29 @@ export function CuratorSubmissionPage() {
       const isAudioVideo = submission.answerType === 'AUDIO' || submission.answerType === 'VIDEO';
       const audioUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/audio-submissions/play/${submission.answerFileId}`;
       
+      // DEBUG - выведем в консоль
+      console.log('[CuratorSubmissionPage] DEBUG:', {
+        answerFileId: submission.answerFileId,
+        answerType: submission.answerType,
+        isAudioVideo,
+        hasAnswerText: !!submission.answerText,
+      });
+      
       return (
         <div className="answer-file">
           <div className="answer-type-badge">
             {submission.answerType === 'AUDIO' ? '🎤 Голосовое сообщение' :
              submission.answerType === 'VIDEO' ? '📹 Видео-кружок' :
              `📎 Файл (${submission.answerType})`}
+          </div>
+          
+          {/* DEBUG info */}
+          <div style={{padding: '10px', background: '#f0f0f0', margin: '10px 0', fontSize: '12px'}}>
+            <strong>DEBUG:</strong><br/>
+            answerType: {submission.answerType}<br/>
+            isAudioVideo: {isAudioVideo ? 'true' : 'false'}<br/>
+            hasAnswerText: {submission.answerText ? 'true' : 'false'}<br/>
+            answerFileId: {submission.answerFileId}
           </div>
           
           {isAudioVideo && submission.answerText && (
