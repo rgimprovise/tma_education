@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
 import { validateTelegramWebAppData } from './utils/telegram-validator';
 import { isCurator } from '../users/curators.config';
@@ -10,11 +11,17 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
   async validateTelegramWebApp(initData: string) {
     // Валидация подписи Telegram WebApp
-    const isValid = validateTelegramWebAppData(initData);
+    const botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
+    if (!botToken) {
+      throw new UnauthorizedException('Bot token not configured');
+    }
+
+    const isValid = validateTelegramWebAppData(initData, botToken);
     if (!isValid) {
       throw new UnauthorizedException('Invalid Telegram WebApp data');
     }

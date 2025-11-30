@@ -8,11 +8,14 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 3000);
+  const tmaUrl = configService.get<string>('TMA_URL', 'http://localhost:5173');
 
-  // CORS для TMA
+  // CORS для TMA - ограничено конкретным origin для безопасности
   app.enableCors({
-    origin: true,
+    origin: [tmaUrl, 'http://localhost:5173', 'http://localhost:3000'],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   // Глобальная валидация

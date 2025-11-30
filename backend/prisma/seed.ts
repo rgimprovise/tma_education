@@ -29,7 +29,7 @@ async function main() {
     },
   });
 
-  const ivan = await prisma.user.upsert({
+  const eduard = await prisma.user.upsert({
     where: { telegramId: '447493564' },
     update: {
       role: 'CURATOR',
@@ -45,7 +45,7 @@ async function main() {
     },
   });
 
-  console.log('✅ Созданы пользователи:', rostislav.firstName, '(ADMIN),', ivan.firstName, '(CURATOR)');
+  console.log('✅ Созданы пользователи:', rostislav.firstName, '(ADMIN),', eduard.firstName, '(CURATOR)');
 
   // === СОЗДАНИЕ КУРСА ===
   const mintoCourse = await prisma.course.create({

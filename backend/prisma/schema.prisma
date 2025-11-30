@@ -25,6 +25,9 @@ model User {
   enrollments         Enrollment[]
   submissions         Submission[]
   unlockedEnrollments Enrollment[] @relation("UnlockedBy") // Модули, которые открыл этот куратор
+
+  @@index([telegramId]) // Оптимизация для частых lookup при /start и webhook'ах
+  @@index([role]) // Оптимизация для поиска кураторов
 }
 
 enum UserRole {
@@ -118,6 +121,8 @@ model Enrollment {
   @@unique([userId, moduleId]) // один пользователь - один enrollment на модуль
   @@index([userId])
   @@index([moduleId])
+  @@index([status]) // Оптимизация для поиска активных/завершённых enrollments
+  @@index([userId, status]) // Оптимизация для queries "прогресс пользователя"
 }
 
 enum ModuleStatus {
@@ -160,6 +165,8 @@ model Submission {
   @@index([moduleId])
   @@index([stepId])
   @@index([status]) // для быстрого поиска по статусу
+  @@index([moduleId, status]) // Оптимизация для "все сдачи модуля на проверке"
+  @@index([userId, status]) // Оптимизация для "мои сдачи со статусом X"
 }
 
 enum SubmissionStatus {
