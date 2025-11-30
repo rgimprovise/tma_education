@@ -510,7 +510,12 @@
     max-width: 100%;
   }
 
-  .stats-grid,
+  .stats-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px;
+  }
+  
   .actions-grid,
   .info-grid {
     grid-template-columns: 1fr;
