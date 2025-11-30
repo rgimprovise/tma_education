@@ -123,11 +123,12 @@
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 16px;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  grid-auto-columns: minmax(0, 1fr);
 }
 
 .stat-card {
@@ -534,6 +535,7 @@
     grid-template-columns: 1fr;
     gap: 16px;
     max-width: 100%;
+    grid-auto-columns: 1fr;
   }
 
   .module-card {
@@ -604,12 +606,13 @@
 
 .modules-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(0, 1fr));
   gap: 20px;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
   overflow: hidden;
+  grid-auto-columns: minmax(0, 1fr);
 }
 
 .module-card {
@@ -624,6 +627,7 @@
   overflow: hidden;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
 }
 
@@ -752,15 +756,21 @@
   flex-direction: column;
   gap: 10px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .module-actions-row {
   display: flex;
   gap: 10px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
   flex-wrap: wrap;
+  overflow: hidden;
 }
 
 .btn-unlock,
