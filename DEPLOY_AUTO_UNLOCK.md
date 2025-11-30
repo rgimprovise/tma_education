@@ -25,9 +25,23 @@ npx prisma migrate deploy
 npm run build
 ```
 
-### Шаг 4: Перезапустить приложение
+### Шаг 4: Перезапустить backend
 ```bash
 pm2 restart minto-backend
+```
+
+### Шаг 5: Обновить и пересобрать TMA
+```bash
+cd /var/www/tma_education/tma
+
+# Обновить код из GitHub
+git pull
+
+# Пересобрать TMA
+npm run build
+
+# Если используется статический сервер, перезапустить его
+# (или просто обновить файлы в dist/, если они обслуживаются через Caddy/Nginx)
 ```
 
 ## Проверка
