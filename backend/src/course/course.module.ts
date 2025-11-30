@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CourseService } from './course.service';
 import { CoursesService } from './courses.service';
 import { CourseAdminService } from './course-admin.service';
+import { CourseReportService } from './course-report.service';
 import { CourseController } from './course.controller';
 import { CourseAdminController } from './admin.controller';
 import { CourseBuilderController } from './course-builder.controller';
@@ -17,8 +18,8 @@ import { TelegramModule } from '../telegram/telegram.module';
     CourseBuilderController,
     CourseCoursesController,
   ],
-  providers: [CourseService, CoursesService, CourseAdminService],
-  exports: [CourseService, CoursesService, CourseAdminService],
+  providers: [CourseService, CoursesService, CourseAdminService, CourseReportService],
+  exports: [CourseService, CoursesService, CourseAdminService, CourseReportService],
 })
 export class CourseModule {}
 
