@@ -301,7 +301,7 @@ export class AudioSubmissionsService {
       // 7. Уведомить ученика (БЕЗ AI оценки - она только для куратора)
       const learnerMessage = `✅ Аудио принято и обработано!\n\n⏳ Ваш ответ отправлен куратору на проверку. Результат появится после проверки куратором.`;
 
-      await this.telegramService.sendMessage(user.telegramId!, learnerMessage);
+      await this.telegramService.notifyLearnerAboutAudioSubmission(user.telegramId!, learnerMessage);
 
       // 8. Найти кураторов и уведомить их
       const curators = await this.prisma.user.findMany({

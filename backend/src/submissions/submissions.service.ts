@@ -549,7 +549,7 @@ export class SubmissionsService {
     curators.forEach((curator) => {
       if (curator.telegramId && curator.telegramId !== null) {
         this.telegramService
-          .sendMessage(curator.telegramId, notificationText)
+          .notifyCuratorAboutResubmissionRequest(curator.telegramId, notificationText)
           .catch((error) => {
             console.error('Failed to notify curator about resubmission request:', error);
           });
@@ -599,7 +599,7 @@ export class SubmissionsService {
 
     if (submission.user.telegramId) {
       this.telegramService
-        .sendMessage(submission.user.telegramId, notificationText)
+        .notifyLearnerAboutSubmissionDeletion(submission.user.telegramId, notificationText)
         .catch((error) => {
           console.error('Failed to notify learner about submission deletion:', error);
         });

@@ -155,13 +155,40 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       }
     });
 
-    // Обработка текстовых сообщений (для диалога регистрации)
+    // Обработка текстовых сообщений (для диалога регистрации и кнопки "Открыть приложение")
     this.bot.on('message:text', async (ctx: Context) => {
       try {
-        // Проверяем, находится ли пользователь в процессе регистрации
         const telegramId = ctx.from?.id.toString();
         if (!telegramId) return;
 
+        const text = ctx.message?.text?.trim();
+
+        // Обработка кнопки "Открыть приложение"
+        if (text === '📚 Открыть приложение') {
+          const user = await this.usersService.findByTelegramId(telegramId);
+          if (!user) {
+            await ctx.reply('❌ Пользователь не найден. Отправьте /start для регистрации.');
+            return;
+          }
+
+          if (!user.profileCompleted) {
+            await ctx.reply('⚠️ Завершите регистрацию, отправив /start');
+            return;
+          }
+
+          await ctx.reply('Открываю приложение...', {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  this.getAppInlineButton(),
+                ],
+              ],
+            },
+          });
+          return;
+        }
+
+        // Проверяем, находится ли пользователь в процессе регистрации
         const registrationData = this.registrationStates.get(telegramId);
         if (registrationData) {
           await this.handleRegistrationStep(ctx, registrationData);
@@ -335,20 +362,22 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           reply_markup: {
             inline_keyboard: [
               [
-                {
-                  text: '📚 Открыть учебное приложение',
-                  web_app: { url: this.tmaUrl },
-                },
+                this.getAppInlineButton(),
               ],
             ],
           },
+        });
+
+        // Отправляем reply-клавиатуру для постоянного доступа
+        await ctx.reply('💡 Вы всегда можете открыть приложение, нажав кнопку ниже:', {
+          reply_markup: this.getAppReplyKeyboard(),
         });
         break;
     }
   }
 
   /**
-   * Отправка приветствия с WebApp кнопкой
+   * Отправка приветствия с WebApp кнопкой и reply-клавиатурой
    */
   private async sendWelcomeWithWebApp(ctx: Context, role: string) {
     const welcomeMessage = this.getWelcomeMessage(role);
@@ -357,13 +386,15 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       reply_markup: {
         inline_keyboard: [
           [
-            {
-              text: '📚 Открыть учебное приложение',
-              web_app: { url: this.tmaUrl },
-            },
+            this.getAppInlineButton(),
           ],
         ],
       },
+    });
+
+    // Отправляем reply-клавиатуру отдельным сообщением для постоянного отображения
+    await ctx.reply('💡 Вы всегда можете открыть приложение, нажав кнопку ниже:', {
+      reply_markup: this.getAppReplyKeyboard(),
     });
   }
 
@@ -387,6 +418,35 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
 • Эффективно коммуницировать
 
 Нажмите кнопку ниже, чтобы открыть учебное приложение.`;
+  }
+
+  /**
+   * Получить reply-клавиатуру с кнопкой "Открыть приложение"
+   * Используется для постоянной клавиатуры в чате
+   */
+  private getAppReplyKeyboard() {
+    return {
+      keyboard: [
+        [
+          {
+            text: '📚 Открыть приложение',
+          },
+        ],
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: false, // Клавиатура всегда видна
+    };
+  }
+
+  /**
+   * Получить inline-кнопку "Открыть приложение"
+   * Используется в уведомлениях
+   */
+  private getAppInlineButton() {
+    return {
+      text: '📚 Открыть приложение',
+      web_app: { url: this.tmaUrl },
+    };
   }
 
   /**
@@ -476,6 +536,9 @@ ${submission.aiFeedback ? `💬 Комментарий ИИ:\n${submission.aiFee
               callback_data: `curator_return_${submission.id}`,
             },
           ],
+          [
+            this.getAppInlineButton(),
+          ],
         ],
       },
     });
@@ -504,7 +567,15 @@ ${submission.curatorFeedback ? `💬 Комментарий куратора:\n$
 
 Продолжайте в том же духе! 🎉`;
 
-      await this.sendMessage(learnerTelegramId, message);
+      await this.sendMessage(learnerTelegramId, message, {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              this.getAppInlineButton(),
+            ],
+          ],
+        },
+      });
     } else if (submission.status === 'CURATOR_RETURNED') {
       const message = `↩️ Сдача возвращена на доработку
 
@@ -516,7 +587,15 @@ ${submission.curatorFeedback || 'Требуется доработка'}
 
 Пожалуйста, доработайте и отправьте снова.`;
 
-      await this.sendMessage(learnerTelegramId, message);
+      await this.sendMessage(learnerTelegramId, message, {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              this.getAppInlineButton(),
+            ],
+          ],
+        },
+      });
     }
   }
 
@@ -537,7 +616,15 @@ ${submission.curatorFeedback || 'Требуется доработка'}
 
 Ждите открытия следующего модуля куратором.`;
 
-    await this.sendMessage(learnerTelegramId, message);
+    await this.sendMessage(learnerTelegramId, message, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            this.getAppInlineButton(),
+          ],
+        ],
+      },
+    });
   }
 
   /**
@@ -563,10 +650,7 @@ ${submission.curatorFeedback || 'Требуется доработка'}
       reply_markup: {
         inline_keyboard: [
           [
-            {
-              text: '📚 Открыть учебное приложение',
-              web_app: { url: this.tmaUrl },
-            },
+            this.getAppInlineButton(),
           ],
         ],
       },
@@ -690,10 +774,67 @@ ${submission.curatorFeedback || 'Требуется доработка'}
       reply_markup: {
         inline_keyboard: [
           [
-            {
-              text: '👁️ Посмотреть в TMA',
-              web_app: { url: this.tmaUrl },
-            },
+            this.getAppInlineButton(),
+          ],
+        ],
+      },
+    });
+  }
+
+  /**
+   * Уведомить куратора о запросе повторной отправки (простая версия)
+   * @param curatorTelegramId - Telegram ID куратора
+   * @param message - Текст уведомления
+   */
+  async notifyCuratorAboutResubmissionRequest(
+    curatorTelegramId: string,
+    message: string,
+  ): Promise<void> {
+    await this.sendMessage(curatorTelegramId, message, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            this.getAppInlineButton(),
+          ],
+        ],
+      },
+    });
+  }
+
+  /**
+   * Уведомить ученика об удалении сдачи
+   * @param learnerTelegramId - Telegram ID ученика
+   * @param message - Текст уведомления
+   */
+  async notifyLearnerAboutSubmissionDeletion(
+    learnerTelegramId: string,
+    message: string,
+  ): Promise<void> {
+    await this.sendMessage(learnerTelegramId, message, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            this.getAppInlineButton(),
+          ],
+        ],
+      },
+    });
+  }
+
+  /**
+   * Уведомить ученика о принятии аудио-сдачи
+   * @param learnerTelegramId - Telegram ID ученика
+   * @param message - Текст уведомления
+   */
+  async notifyLearnerAboutAudioSubmission(
+    learnerTelegramId: string,
+    message: string,
+  ): Promise<void> {
+    await this.sendMessage(learnerTelegramId, message, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            this.getAppInlineButton(),
           ],
         ],
       },
