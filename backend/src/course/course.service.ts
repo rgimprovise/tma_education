@@ -396,6 +396,7 @@ export class CourseService {
         select: { id: true },
       });
       targetUserIds = allLearners.map((u) => u.id);
+      console.log(`[unlockModuleForUsers] Opening module ${moduleId} for all ${targetUserIds.length} learners`);
     } else if (allCompletedPrevious) {
       // Находим всех пользователей, которые завершили предыдущий модуль
       const previousModuleIndex = module.index - 1;
@@ -464,6 +465,7 @@ export class CourseService {
 
         if (existing) {
           // Обновляем существующий Enrollment
+          console.log(`[unlockModuleForUsers] Updating existing enrollment for user ${userId}, module ${moduleId}`);
           return this.prisma.enrollment.update({
             where: { id: existing.id },
             data: {
@@ -474,6 +476,7 @@ export class CourseService {
           });
         } else {
           // Создаём новый Enrollment
+          console.log(`[unlockModuleForUsers] Creating new enrollment for user ${userId}, module ${moduleId}`);
           return this.prisma.enrollment.create({
             data: {
               userId,
@@ -661,6 +664,8 @@ export class CourseService {
    * @param userId - ID нового ученика
    */
   async autoUnlockModulesForNewLearner(userId: string): Promise<void> {
+    console.log(`[autoUnlockModulesForNewLearner] Starting auto-unlock for new learner ${userId}`);
+    
     // Находим все модули с autoUnlockForNewLearners = true
     const autoUnlockModules = await this.prisma.courseModule.findMany({
       where: {
@@ -673,14 +678,31 @@ export class CourseService {
       },
     });
 
+    console.log(`[autoUnlockModulesForNewLearner] Found ${autoUnlockModules.length} modules with autoUnlockForNewLearners = true`);
+
     if (autoUnlockModules.length === 0) {
+      console.log(`[autoUnlockModulesForNewLearner] No modules to auto-unlock for user ${userId}`);
       return; // Нет модулей для автоматического открытия
     }
 
-    // Создаём Enrollment для каждого модуля
+    // Создаём Enrollment для каждого модуля (только если его еще нет)
     const enrollments = await Promise.all(
-      autoUnlockModules.map((module) =>
-        this.prisma.enrollment.create({
+      autoUnlockModules.map(async (module) => {
+        // Проверяем, нет ли уже Enrollment для этого модуля
+        const existing = await this.prisma.enrollment.findFirst({
+          where: {
+            userId,
+            moduleId: module.id,
+          },
+        });
+
+        if (existing) {
+          console.log(`[autoUnlockModulesForNewLearner] Enrollment already exists for user ${userId}, module ${module.id}`);
+          return existing;
+        }
+
+        console.log(`[autoUnlockModulesForNewLearner] Creating enrollment for user ${userId}, module ${module.id} (${module.index}: ${module.title})`);
+        return this.prisma.enrollment.create({
           data: {
             userId,
             moduleId: module.id,
@@ -688,8 +710,8 @@ export class CourseService {
             unlockedAt: new Date(),
             // unlockedById не устанавливаем, так как это автоматическое открытие
           },
-        }),
-      ),
+        });
+      }),
     );
 
     // Отправляем уведомления пользователю

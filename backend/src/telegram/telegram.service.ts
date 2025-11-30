@@ -292,6 +292,23 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         profileCompleted: false, // Новый пользователь требует регистрации
       });
       this.logger.log(`New user created: ${telegramId} with role ${role}`);
+      
+      // Если новый пользователь - LEARNER, автоматически открываем модули с autoUnlockForNewLearners = true
+      if (user.role === 'LEARNER') {
+        try {
+          const { CourseService } = await import('../course/course.service');
+          const courseService = this.moduleRef.get(CourseService, { strict: false });
+          if (courseService) {
+            // Вызываем асинхронно, не блокируя ответ
+            courseService.autoUnlockModulesForNewLearner(user.id).catch((error) => {
+              this.logger.error(`Failed to auto-unlock modules for new learner ${user.id}:`, error);
+            });
+          }
+        } catch (error) {
+          this.logger.error(`Failed to get CourseService for auto-unlock for user ${user.id}:`, error);
+          // Не критично, продолжаем
+        }
+      }
     } else {
       // Обновляем роль существующего пользователя, если он куратор
       if (isCurator(telegramId) && user.role !== 'CURATOR' && user.role !== 'ADMIN') {
