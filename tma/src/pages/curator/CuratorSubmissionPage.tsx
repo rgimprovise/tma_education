@@ -216,7 +216,47 @@ export function CuratorSubmissionPage() {
   const renderAnswerContent = () => {
     if (!submission) return null;
 
-    // Если есть formSchema — парсим ответ
+    // ВАЖНО: Проверяем answerFileId ПЕРВЫМ (для аудио/видео/файлов)
+    // Потому что у аудио ЕСТЬ и answerText (транскрипция) и answerFileId
+    if (submission.answerFileId) {
+      const isAudioVideo = submission.answerType === 'AUDIO' || submission.answerType === 'VIDEO';
+      const audioUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/audio-submissions/play/${submission.answerFileId}`;
+      
+      return (
+        <div className="answer-file">
+          <div className="answer-type-badge">
+            {submission.answerType === 'AUDIO' ? '🎤 Голосовое сообщение' :
+             submission.answerType === 'VIDEO' ? '📹 Видео-кружок' :
+             `📎 Файл (${submission.answerType})`}
+          </div>
+          
+          {isAudioVideo && submission.answerText && (
+            <div className="transcription-block">
+              <div className="transcription-title">📝 Транскрипт:</div>
+              <div className="transcription-text">{submission.answerText}</div>
+            </div>
+          )}
+          
+          {isAudioVideo && (
+            <button
+              className="btn btn-play-audio"
+              onClick={() => window.open(audioUrl, '_blank')}
+            >
+              🎧 Прослушать аудио
+            </button>
+          )}
+          
+          {!isAudioVideo && (
+            <div className="file-info">
+              <p>File ID: <code>{submission.answerFileId}</code></p>
+              <p className="hint">Для просмотра файла обратитесь к Telegram API</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Если answerFileId нет, проверяем formSchema и текстовые ответы
     if (submission.step.formSchema && submission.answerText) {
       try {
         const answersObj = JSON.parse(submission.answerText);
@@ -247,62 +287,6 @@ export function CuratorSubmissionPage() {
       return (
         <div className="answer-text">
           {submission.answerText}
-        </div>
-      );
-    }
-
-    // Файл/аудио/видео
-    if (submission.answerFileId) {
-      const isAudioVideo = submission.answerType === 'AUDIO' || submission.answerType === 'VIDEO';
-      const audioUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/audio-submissions/play/${submission.answerFileId}`;
-      
-      // DEBUG - выведем в консоль
-      console.log('[CuratorSubmissionPage] DEBUG:', {
-        answerFileId: submission.answerFileId,
-        answerType: submission.answerType,
-        isAudioVideo,
-        hasAnswerText: !!submission.answerText,
-      });
-      
-      return (
-        <div className="answer-file">
-          <div className="answer-type-badge">
-            {submission.answerType === 'AUDIO' ? '🎤 Голосовое сообщение' :
-             submission.answerType === 'VIDEO' ? '📹 Видео-кружок' :
-             `📎 Файл (${submission.answerType})`}
-          </div>
-          
-          {/* DEBUG info */}
-          <div style={{padding: '10px', background: '#f0f0f0', margin: '10px 0', fontSize: '12px'}}>
-            <strong>DEBUG:</strong><br/>
-            answerType: {submission.answerType}<br/>
-            isAudioVideo: {isAudioVideo ? 'true' : 'false'}<br/>
-            hasAnswerText: {submission.answerText ? 'true' : 'false'}<br/>
-            answerFileId: {submission.answerFileId}
-          </div>
-          
-          {isAudioVideo && submission.answerText && (
-            <div className="transcription-block">
-              <div className="transcription-title">📝 Транскрипт:</div>
-              <div className="transcription-text">{submission.answerText}</div>
-            </div>
-          )}
-          
-          {isAudioVideo && (
-            <button
-              className="btn btn-play-audio"
-              onClick={() => window.open(audioUrl, '_blank')}
-            >
-              🎧 Прослушать аудио
-            </button>
-          )}
-          
-          {!isAudioVideo && (
-            <div className="file-info">
-              <p>File ID: <code>{submission.answerFileId}</code></p>
-              <p className="hint">Для просмотра файла обратитесь к Telegram API</p>
-            </div>
-          )}
         </div>
       );
     }
