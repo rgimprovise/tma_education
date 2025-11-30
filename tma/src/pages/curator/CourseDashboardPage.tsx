@@ -192,55 +192,45 @@ export function CourseDashboardPage() {
         return;
       }
 
-      // Формируем URL для отчёта
+      // Формируем URL для отчёта с токеном в query (для прямого открытия)
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const reportUrl = `${apiUrl}/admin/courses/${courseId}/report/html`;
+      const reportUrl = `${apiUrl}/admin/courses/${courseId}/report/html?token=${encodeURIComponent(token)}`;
       
-      // Используем fetch для получения HTML с авторизацией
-      const response = await fetch(reportUrl, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      // Открываем отчёт в новой вкладке через прямой URL
+      // Это работает везде, включая Mac, так как это обычный HTTP запрос
+      const newWindow = window.open(reportUrl, '_blank');
+      
+      if (!newWindow) {
+        // Если popup заблокирован, скачиваем файл
+        const response = await fetch(reportUrl, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
 
-      if (!response.ok) {
-        throw new Error('Ошибка загрузки отчёта');
-      }
-
-      const html = await response.text();
-      
-      // Скачиваем файл (работает везде)
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      const dateStr = new Date().toISOString().split('T')[0];
-      link.download = `отчет_курс_${dateStr}.html`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      // Открываем в новой вкладке через прямой URL к эндпоинту
-      // Создаём временную форму для отправки POST с токеном, или используем прямой переход
-      // Проще всего - открыть в той же вкладке через прямой URL
-      // Но для этого нужен токен в URL, что небезопасно
-      // Вместо этого - просто открываем data URL в новой вкладке
-      // Если это не работает, пользователь может открыть скачанный файл
-      try {
-        const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
-        const newWindow = window.open();
-        if (newWindow) {
-          newWindow.document.write(html);
-          newWindow.document.close();
+        if (!response.ok) {
+          throw new Error('Ошибка загрузки отчёта');
         }
-      } catch (e) {
-        // Если не удалось открыть, просто скачиваем файл
-        console.log('Could not open in new window, file downloaded instead');
-      }
-      
-      if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert('✅ Отчёт скачан. Файл сохранён в загрузках.');
+
+        const html = await response.text();
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const dateStr = new Date().toISOString().split('T')[0];
+        link.download = `отчет_курс_${dateStr}.html`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        if (window.Telegram?.WebApp) {
+          window.Telegram.WebApp.showAlert('✅ Отчёт скачан. Файл сохранён в загрузках.');
+        }
+      } else {
+        if (window.Telegram?.WebApp) {
+          window.Telegram.WebApp.showAlert('✅ Отчёт открывается в новой вкладке.');
+        }
       }
     } catch (err: any) {
       console.error('Failed to load report:', err);
