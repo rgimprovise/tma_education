@@ -1,11 +1,18 @@
 .learners-list {
   margin-top: 24px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .learner-card {
   position: relative;
   cursor: pointer;
   transition: all 0.2s ease;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .learner-card:hover {
@@ -86,6 +93,9 @@
 .stat-text {
   color: var(--tg-theme-text-color, #000000);
   flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .stat-text strong {
