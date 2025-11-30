@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ModuleRef } from '@nestjs/core';
-import { Bot, Context } from 'grammy';
+import { Bot, Context, InputFile } from 'grammy';
 import { UsersService } from '../users/users.service';
 import { isCurator } from '../users/curators.config';
 import { UserRole } from '@prisma/client';
@@ -1142,6 +1142,44 @@ ${submission.curatorFeedback || 'Требуется доработка'}
       };
     } catch (error: any) {
       this.logger.error('Failed to delete webhook:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Отправить HTML-файл (отчёт) пользователю
+   * @param telegramId - Telegram ID пользователя
+   * @param htmlContent - Содержимое HTML файла
+   * @param filename - Имя файла
+   * @param caption - Подпись к файлу (опционально)
+   */
+  async sendDocument(
+    telegramId: string,
+    htmlContent: string,
+    filename: string,
+    caption?: string,
+  ): Promise<any> {
+    if (!this.bot || !this.isRunning) {
+      this.logger.warn('Bot is not running. Cannot send document.');
+      throw new Error('Bot is not running');
+    }
+
+    try {
+      // Создаём InputFile из строки HTML
+      const file = new InputFile(
+        Buffer.from(htmlContent, 'utf-8'),
+        filename,
+      );
+
+      const sentMessage = await this.bot.api.sendDocument(telegramId, file, {
+        caption,
+        parse_mode: 'HTML',
+      });
+
+      this.logger.debug(`Document sent to ${telegramId}, message_id: ${sentMessage.message_id}`);
+      return sentMessage;
+    } catch (error: any) {
+      this.logger.error(`Failed to send document to ${telegramId}:`, error.message);
       throw error;
     }
   }

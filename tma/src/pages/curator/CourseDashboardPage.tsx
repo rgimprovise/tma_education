@@ -209,13 +209,24 @@ export function CourseDashboardPage() {
 
       const html = await response.text();
       
-      // Создаём новое окно и вставляем HTML
-      const newWindow = window.open('', '_blank');
-      if (newWindow) {
-        newWindow.document.write(html);
-        newWindow.document.close();
-      } else {
-        alert('Не удалось открыть отчёт. Разрешите всплывающие окна в настройках браузера.');
+      // Создаём blob URL и скачиваем файл (работает везде, включая десктоп)
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.download = `отчет_курс_${dateStr}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      // Также открываем в новой вкладке через data URL (работает везде)
+      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+      window.open(dataUrl, '_blank');
+      
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert('✅ Отчёт скачан и открыт в новой вкладке.');
       }
     } catch (err: any) {
       console.error('Failed to load report:', err);
@@ -224,6 +235,28 @@ export function CourseDashboardPage() {
         window.Telegram.WebApp.showAlert(`❌ Ошибка загрузки отчёта: ${errorMessage}`);
       } else {
         alert(`❌ Ошибка загрузки отчёта: ${errorMessage}`);
+      }
+    }
+  };
+
+  const handleSendReportToTelegram = async () => {
+    if (!courseId) return;
+
+    try {
+      const response = await api.post(`/admin/courses/${courseId}/report/send-telegram`);
+      
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert('✅ Отчёт отправлен в Telegram!');
+      } else {
+        alert('✅ Отчёт отправлен в Telegram!');
+      }
+    } catch (err: any) {
+      console.error('Failed to send report to Telegram:', err);
+      const errorMessage = err.response?.data?.message || 'Ошибка отправки отчёта';
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`❌ ${errorMessage}`);
+      } else {
+        alert(`❌ ${errorMessage}`);
       }
     }
   };
@@ -344,8 +377,8 @@ export function CourseDashboardPage() {
         </div>
       </div>
 
-      {/* Кнопка для открытия отчёта */}
-      <div className="actions-section" style={{ marginBottom: '24px' }}>
+      {/* Кнопки для работы с отчётом */}
+      <div className="actions-section" style={{ marginBottom: '24px', display: 'flex', gap: '12px', flexDirection: 'column' }}>
         <button 
           className="btn btn-primary" 
           onClick={handleOpenReport}
@@ -357,6 +390,18 @@ export function CourseDashboardPage() {
           }}
         >
           📊 Скачать отчёт по курсу
+        </button>
+        <button 
+          className="btn btn-secondary" 
+          onClick={handleSendReportToTelegram}
+          style={{ 
+            width: '100%',
+            padding: '12px 20px',
+            fontSize: '16px',
+            fontWeight: '600',
+          }}
+        >
+          📤 Отправить отчёт в Telegram
         </button>
       </div>
 

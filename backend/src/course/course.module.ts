@@ -22,4 +22,3 @@ import { TelegramModule } from '../telegram/telegram.module';
   exports: [CourseService, CoursesService, CourseAdminService, CourseReportService],
 })
 export class CourseModule {}
-
