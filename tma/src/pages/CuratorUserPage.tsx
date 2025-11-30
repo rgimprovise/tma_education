@@ -232,8 +232,9 @@ export function CuratorUserPage() {
           className="btn btn-danger"
           onClick={handleDeleteUser}
           disabled={deleting}
+          title="Удалить пользователя"
         >
-          {deleting ? '🔄 Удаляю...' : '🗑️ Удалить пользователя'}
+          {deleting ? '🔄 Удаляю...' : '🗑️ Удалить'}
         </button>
       </div>
 
@@ -269,7 +270,7 @@ export function CuratorUserPage() {
           learner.enrollments.map((enrollment) => (
             <div key={enrollment.id} className="card enrollment-card">
               <div className="card-title">
-                Модуль {enrollment.module.index}: {enrollment.module.title}
+                {enrollment.module.title}
               </div>
               {enrollment.module.description && (
                 <div className="card-subtitle">{enrollment.module.description}</div>
