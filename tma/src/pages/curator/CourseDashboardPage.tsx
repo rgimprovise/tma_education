@@ -181,6 +181,53 @@ export function CourseDashboardPage() {
     navigate('/curator/courses');
   };
 
+  const handleOpenReport = async () => {
+    if (!courseId) return;
+
+    try {
+      // Получаем токен для авторизации
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Необходима авторизация');
+        return;
+      }
+
+      // Формируем URL для отчёта
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const reportUrl = `${apiUrl}/admin/courses/${courseId}/report/html`;
+      
+      // Используем fetch для получения HTML с авторизацией
+      const response = await fetch(reportUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Ошибка загрузки отчёта');
+      }
+
+      const html = await response.text();
+      
+      // Создаём новое окно и вставляем HTML
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(html);
+        newWindow.document.close();
+      } else {
+        alert('Не удалось открыть отчёт. Разрешите всплывающие окна в настройках браузера.');
+      }
+    } catch (err: any) {
+      console.error('Failed to load report:', err);
+      const errorMessage = err.message || 'Неизвестная ошибка';
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`❌ Ошибка загрузки отчёта: ${errorMessage}`);
+      } else {
+        alert(`❌ Ошибка загрузки отчёта: ${errorMessage}`);
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="course-dashboard">
@@ -295,6 +342,22 @@ export function CourseDashboardPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Кнопка для открытия отчёта */}
+      <div className="actions-section" style={{ marginBottom: '24px' }}>
+        <button 
+          className="btn btn-primary" 
+          onClick={handleOpenReport}
+          style={{ 
+            width: '100%',
+            padding: '12px 20px',
+            fontSize: '16px',
+            fontWeight: '600',
+          }}
+        >
+          📊 Скачать отчёт по курсу
+        </button>
       </div>
 
       <div className="modules-section">
