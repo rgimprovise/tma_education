@@ -521,11 +521,11 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
    */
   private getAppReplyKeyboard(role?: string) {
     const keyboard: any[] = [
-      [
-        {
-          text: '📚 Открыть приложение',
-        },
-      ],
+        [
+          {
+            text: '📚 Открыть приложение',
+          },
+        ],
     ];
 
     // Для учеников добавляем кнопку "Задать вопрос куратору"
@@ -1294,27 +1294,39 @@ ${submission.curatorFeedback || 'Требуется доработка'}
       return;
     }
 
-    // Получаем информацию об ученике
-    const user = await this.usersService.findByTelegramId(questionData.telegramId);
-    if (!user) {
-      await ctx.reply('❌ Пользователь не найден.');
-      this.questionStates.delete(questionData.telegramId);
-      return;
-    }
-
-    // Формируем информацию об отправителе
-    const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Ученик';
-    const userInfo = [
-      `👤 От: ${userName}`,
-      user.position ? `💼 Должность: ${user.position}` : null,
-    ]
-      .filter(Boolean)
-      .join('\n');
-
-    const messageToCurator = `❓ Вопрос от ученика\n\n${userInfo}\n\n📝 Сообщение:\n${text}`;
+    this.logger.log(`[handleQuestionMessage] Processing question from user ${questionData.telegramId}`);
 
     try {
+      // Получаем информацию об ученике
+      const user = await this.usersService.findByTelegramId(questionData.telegramId);
+      if (!user) {
+        this.logger.error(`[handleQuestionMessage] User not found: ${questionData.telegramId}`);
+        await ctx.reply('❌ Пользователь не найден.');
+        this.questionStates.delete(questionData.telegramId);
+        return;
+      }
+
+      this.logger.log(`[handleQuestionMessage] User found: ${user.id}, role: ${user.role}`);
+
+      // Формируем информацию об отправителе
+      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Ученик';
+      const userInfo = [
+        `👤 От: ${userName}`,
+        user.position ? `💼 Должность: ${user.position}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      const messageToCurator = `❓ Вопрос от ученика\n\n${userInfo}\n\n📝 Сообщение:\n${text}`;
+
+      // Проверяем, что prisma доступен
+      if (!this.prisma) {
+        this.logger.error('[handleQuestionMessage] PrismaService is not available');
+        throw new Error('PrismaService is not available');
+      }
+
       // Находим всех кураторов
+      this.logger.log('[handleQuestionMessage] Searching for curators...');
       const curators = await this.prisma.user.findMany({
         where: {
           role: {
@@ -1329,6 +1341,8 @@ ${submission.curatorFeedback || 'Требуется доработка'}
         },
       });
 
+      this.logger.log(`[handleQuestionMessage] Found ${curators.length} curators`);
+
       if (curators.length === 0) {
         await ctx.reply('❌ К сожалению, сейчас нет доступных кураторов. Попробуйте позже.');
         this.questionStates.delete(questionData.telegramId);
@@ -1336,33 +1350,43 @@ ${submission.curatorFeedback || 'Требуется доработка'}
       }
 
       // Отправляем сообщение каждому куратору
+      this.logger.log('[handleQuestionMessage] Sending messages to curators...');
       const sentMessages = await Promise.all(
         curators.map(async (curator) => {
           if (!curator.telegramId) return null;
           
           try {
+            this.logger.log(`[handleQuestionMessage] Sending to curator ${curator.telegramId}`);
             const sentMessage = await this.sendMessage(curator.telegramId, messageToCurator);
             
             // Сохраняем соответствие messageId куратора и telegramId ученика для обработки reply
             if (sentMessage?.message_id) {
               this.curatorReplyMap.set(sentMessage.message_id, questionData.telegramId);
+              this.logger.log(`[handleQuestionMessage] Saved reply mapping: messageId ${sentMessage.message_id} -> learner ${questionData.telegramId}`);
             }
             
             return sentMessage;
-          } catch (error) {
-            this.logger.error(`Failed to send question to curator ${curator.telegramId}:`, error);
+          } catch (error: any) {
+            this.logger.error(`[handleQuestionMessage] Failed to send question to curator ${curator.telegramId}:`, error);
+            this.logger.error(`[handleQuestionMessage] Error details: ${error.message}, stack: ${error.stack}`);
             return null;
           }
         }),
       );
+
+      const successCount = sentMessages.filter((m) => m !== null).length;
+      this.logger.log(`[handleQuestionMessage] Successfully sent to ${successCount}/${curators.length} curators`);
 
       // Удаляем состояние ожидания вопроса
       this.questionStates.delete(questionData.telegramId);
 
       // Подтверждаем ученику
       await ctx.reply('✅ Ваше сообщение успешно отправлено куратору. Ответ придет в этом чате.');
-    } catch (error) {
-      this.logger.error('Error handling question message:', error);
+    } catch (error: any) {
+      this.logger.error('[handleQuestionMessage] Error handling question message:', error);
+      this.logger.error(`[handleQuestionMessage] Error type: ${error?.constructor?.name}`);
+      this.logger.error(`[handleQuestionMessage] Error message: ${error?.message}`);
+      this.logger.error(`[handleQuestionMessage] Error stack: ${error?.stack}`);
       await ctx.reply('❌ Произошла ошибка при отправке сообщения. Попробуйте позже.');
       this.questionStates.delete(questionData.telegramId);
     }
