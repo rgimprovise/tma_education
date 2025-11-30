@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CoursesService, CreateCourseDto } from './courses.service';
 import { CourseReportService } from './course-report.service';
+import { buildCourseReportHtml } from './course-report-html.builder';
 import { UserRole } from '@prisma/client';
 
 /**
@@ -49,46 +51,24 @@ export class CourseCoursesController {
 
   /**
    * GET /admin/courses/:courseId/report/html
-   * Получить детальный отчёт по курсу
+   * Получить детальный отчёт по курсу в формате HTML
    * 
-   * Пока возвращает JSON (временно для дебага).
-   * В будущем будет возвращать HTML.
+   * Возвращает полноценный HTML-документ с отчётом по курсу,
+   * который можно открыть в браузере или в Telegram как .html файл.
    * 
    * Пример запроса:
    * GET /admin/courses/{courseId}/report/html
    * 
-   * Пример ответа (JSON):
-   * {
-   *   "course": {
-   *     "id": "...",
-   *     "title": "Полный курс по освоению принципа пирамиды Минто",
-   *     "modulesCount": 4,
-   *     "stepsCount": 19,
-   *     "requiredStepsCount": 15,
-   *     ...
-   *   },
-   *   "stats": {
-   *     "totalLearners": 2,
-   *     "startedLearners": 2,
-   *     "completedLearners": 0,
-   *     "avgCompletionPercent": 25.5,
-   *     "totalSubmissions": 6,
-   *     "avgCompletionTime": 5.2,
-   *     ...
-   *   },
-   *   "modules": [...],
-   *   "positions": [...],
-   *   "aiVsCurator": {...},
-   *   "sla": {...},
-   *   "problems": [...]
-   * }
+   * Ответ: HTML-документ с отчётом
    */
   @Get(':courseId/report/html')
   @Roles(UserRole.CURATOR, UserRole.ADMIN)
-  async getCourseReport(@Param('courseId') courseId: string) {
-    // Пока возвращаем JSON для дебага
-    // В будущем здесь будет генерация HTML
-    return this.courseReportService.buildCourseReport(courseId);
+  async getCourseReport(@Param('courseId') courseId: string, @Res() res: Response) {
+    const report = await this.courseReportService.buildCourseReport(courseId);
+    const html = buildCourseReportHtml(report);
+    
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
   }
 }
 
