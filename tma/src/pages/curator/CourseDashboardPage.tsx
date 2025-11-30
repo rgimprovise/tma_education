@@ -188,20 +188,24 @@ export function CourseDashboardPage() {
       // Получаем токен для авторизации
       const token = localStorage.getItem('token');
       if (!token) {
-        alert('Необходима авторизация');
+        if (window.Telegram?.WebApp) {
+          window.Telegram.WebApp.showAlert('❌ Необходима авторизация');
+        } else {
+          alert('Необходима авторизация');
+        }
         return;
       }
 
-      // Формируем URL для отчёта с токеном в query (для прямого открытия)
+      // Формируем URL для отчёта
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const reportUrl = `${apiUrl}/admin/courses/${courseId}/report/html?token=${encodeURIComponent(token)}`;
+      const reportUrl = `${apiUrl}/admin/courses/${courseId}/report/html`;
       
-      // Открываем отчёт в новой вкладке через прямой URL
-      // Это работает везде, включая Mac, так как это обычный HTTP запрос
-      const newWindow = window.open(reportUrl, '_blank');
+      // Сначала пытаемся открыть в новой вкладке через прямой URL с токеном
+      const reportUrlWithToken = `${reportUrl}?token=${encodeURIComponent(token)}`;
+      const newWindow = window.open(reportUrlWithToken, '_blank');
       
-      if (!newWindow) {
-        // Если popup заблокирован, скачиваем файл
+      // Всегда также скачиваем файл для надёжности
+      try {
         const response = await fetch(reportUrl, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -209,7 +213,7 @@ export function CourseDashboardPage() {
         });
 
         if (!response.ok) {
-          throw new Error('Ошибка загрузки отчёта');
+          throw new Error(`Ошибка загрузки отчёта: ${response.status} ${response.statusText}`);
         }
 
         const html = await response.text();
@@ -219,6 +223,7 @@ export function CourseDashboardPage() {
         link.href = url;
         const dateStr = new Date().toISOString().split('T')[0];
         link.download = `отчет_курс_${dateStr}.html`;
+        link.style.display = 'none';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -227,9 +232,11 @@ export function CourseDashboardPage() {
         if (window.Telegram?.WebApp) {
           window.Telegram.WebApp.showAlert('✅ Отчёт скачан. Файл сохранён в загрузках.');
         }
-      } else {
-        if (window.Telegram?.WebApp) {
-          window.Telegram.WebApp.showAlert('✅ Отчёт открывается в новой вкладке.');
+      } catch (downloadErr: any) {
+        console.error('Failed to download report:', downloadErr);
+        // Если скачивание не удалось, но окно открылось - это ОК
+        if (!newWindow) {
+          throw downloadErr;
         }
       }
     } catch (err: any) {
