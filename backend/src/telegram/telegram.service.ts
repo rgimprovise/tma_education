@@ -1327,17 +1327,17 @@ ${submission.curatorFeedback || 'Требуется доработка'}
 
       // Находим всех кураторов
       this.logger.log('[handleQuestionMessage] Searching for curators...');
-      const curators = await this.prisma.user.findMany({
+      const allCurators = await this.prisma.user.findMany({
         where: {
           role: { in: ['CURATOR', 'ADMIN'] },
-          telegramId: {
-            not: null,
-          },
         },
         select: {
           telegramId: true,
         },
       });
+      
+      // Фильтруем кураторов с telegramId (не null)
+      const curators = allCurators.filter((c) => c.telegramId !== null);
 
       this.logger.log(`[handleQuestionMessage] Found ${curators.length} curators`);
 
