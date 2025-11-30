@@ -243,7 +243,7 @@ export function CourseDashboardPage() {
     if (!courseId) return;
 
     try {
-      const response = await api.post(`/admin/courses/${courseId}/report/send-telegram`);
+      await api.post(`/admin/courses/${courseId}/report/send-telegram`);
       
       if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.showAlert('✅ Отчёт отправлен в Telegram!');
