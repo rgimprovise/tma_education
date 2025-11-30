@@ -86,6 +86,19 @@ export class SubmissionsAdminController {
   }
 
   /**
+   * POST /admin/submissions/:id/approve-resubmission
+   * Разрешить повторную отправку (подтвердить запрос ученика)
+   * Удаляет submission, очищает ответ и отправляет уведомление ученику
+   */
+  @Post(':id/approve-resubmission')
+  @Roles(UserRole.CURATOR, UserRole.ADMIN)
+  async approveResubmissionRequest(
+    @Param('id') id: string,
+  ): Promise<{ message: string }> {
+    return this.submissionsService.approveResubmissionRequest(id);
+  }
+
+  /**
    * DELETE /admin/submissions/:id
    * Удалить сдачу (очистить прогресс по шагу)
    * Позволяет ученику сдать задание заново

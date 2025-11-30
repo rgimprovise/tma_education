@@ -563,6 +563,75 @@ export class SubmissionsService {
   }
 
   /**
+   * Разрешить повторную отправку (подтвердить запрос ученика)
+   * Удаляет submission, очищает ответ и отправляет уведомление ученику
+   * 
+   * @param submissionId ID сдачи
+   * @returns Сообщение об успехе
+   */
+  async approveResubmissionRequest(submissionId: string): Promise<{ message: string }> {
+    // 1. Найти submission
+    const submission = await this.prisma.submission.findUnique({
+      where: { id: submissionId },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, telegramId: true } },
+        step: { select: { id: true, title: true, index: true } },
+        module: { select: { id: true, title: true, index: true } },
+      },
+    });
+
+    if (!submission) {
+      throw new NotFoundException('Submission not found');
+    }
+
+    // 2. Проверяем, что запрос на повторную отправку был сделан
+    if (!submission.resubmissionRequested) {
+      throw new BadRequestException('Ученик не запрашивал повторную отправку для этой сдачи');
+    }
+
+    // 3. Удаляем submission (очищаем ответ)
+    await this.prisma.submission.delete({
+      where: { id: submissionId },
+    });
+
+    // 4. Уведомляем ученика о разрешении повторной отправки
+    const userName = `${submission.user.firstName || ''} ${submission.user.lastName || ''}`.trim() || 'Ученик';
+    if (submission.user.telegramId) {
+      this.telegramService
+        .notifyLearnerAboutResubmissionApproval(
+          submission.user.telegramId,
+          submission.module.index,
+          submission.module.title,
+          submission.step.index,
+          submission.step.title,
+        )
+        .catch((error) => {
+          console.error('Failed to notify learner about resubmission approval:', error);
+        });
+    }
+
+    // 5. Проверяем статус модуля (возможно, он был завершён, а теперь снова незавершён)
+    // Если был COMPLETED, переводим обратно в IN_PROGRESS
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: {
+        userId: submission.userId,
+        moduleId: submission.moduleId,
+      },
+    });
+
+    if (enrollment && enrollment.status === 'COMPLETED') {
+      await this.prisma.enrollment.update({
+        where: { id: enrollment.id },
+        data: { status: 'IN_PROGRESS' },
+      });
+    }
+
+    return {
+      message: `Запрос на повторную отправку одобрен. Ученик ${userName} может выполнить задание заново.`,
+    };
+  }
+
+  /**
    * Удалить сдачу (очистить прогресс ученика по шагу)
    * Позволяет куратору сбросить прогресс и разрешить повторную сдачу
    * 

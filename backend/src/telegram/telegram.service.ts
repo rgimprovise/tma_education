@@ -885,6 +885,41 @@ ${submission.curatorFeedback || 'Требуется доработка'}
   }
 
   /**
+   * Уведомить ученика о разрешении повторной отправки
+   * @param learnerTelegramId - Telegram ID ученика
+   * @param moduleIndex - Индекс модуля
+   * @param moduleTitle - Название модуля
+   * @param stepIndex - Индекс шага
+   * @param stepTitle - Название шага
+   */
+  async notifyLearnerAboutResubmissionApproval(
+    learnerTelegramId: string,
+    moduleIndex: number,
+    moduleTitle: string,
+    stepIndex: number,
+    stepTitle: string,
+  ): Promise<void> {
+    const message = `✅ Ваш запрос на повторную отправку одобрен!
+
+📚 Модуль ${moduleIndex}: ${moduleTitle}
+📝 Шаг ${stepIndex}: ${stepTitle}
+
+🔄 Ваш предыдущий ответ был удалён. Теперь вы можете выполнить задание заново.
+
+Откройте приложение и отправьте новый ответ!`;
+
+    await this.sendMessage(learnerTelegramId, message, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            this.getAppInlineButton(),
+          ],
+        ],
+      },
+    });
+  }
+
+  /**
    * Уведомить ученика о принятии аудио-сдачи
    * @param learnerTelegramId - Telegram ID ученика
    * @param message - Текст уведомления

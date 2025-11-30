@@ -165,6 +165,54 @@ export function CuratorSubmissionPage() {
     }
   };
 
+  const handleApproveResubmission = async () => {
+    if (!submission) return;
+
+    // Подтверждение
+    const userName = `${submission.user.firstName || ''} ${submission.user.lastName || ''}`.trim() || 'Ученик';
+    const confirmMessage = 
+      `Разрешить повторную отправку?\n\n` +
+      `Ученик: ${userName}\n` +
+      `Модуль: ${submission.module.title}\n` +
+      `Шаг: ${submission.step.title}\n\n` +
+      `Предыдущий ответ будет удалён, и ученик сможет выполнить задание заново.`;
+
+    const confirmed = window.Telegram?.WebApp 
+      ? await new Promise<boolean>((resolve) => {
+          window.Telegram?.WebApp?.showConfirm(confirmMessage, (result) => {
+            resolve(result);
+          });
+        })
+      : window.confirm(confirmMessage);
+
+    if (!confirmed) return;
+
+    try {
+      setProcessing(true);
+      await api.post(`/admin/submissions/${submission.id}/approve-resubmission`);
+
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert('✅ Запрос на повторную отправку одобрен. Ученик может выполнить задание заново.', () => {
+          navigate(-1);
+        });
+      } else {
+        alert('✅ Запрос на повторную отправку одобрен');
+        navigate(-1);
+      }
+    } catch (err: any) {
+      console.error('Failed to approve resubmission:', err);
+      const errorMessage = err.response?.data?.message || 'Ошибка при подтверждении запроса';
+      
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`❌ ${errorMessage}`);
+      } else {
+        alert(`❌ ${errorMessage}`);
+      }
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!submission) return;
 
@@ -464,6 +512,16 @@ export function CuratorSubmissionPage() {
           </div>
 
           <div className="action-buttons">
+            {submission.resubmissionRequested && (
+              <button
+                className="btn btn-warning"
+                onClick={handleApproveResubmission}
+                disabled={processing}
+                style={{ marginBottom: '8px', width: '100%' }}
+              >
+                {processing ? 'Обработка...' : '✅ Разрешить повторную отправку'}
+              </button>
+            )}
             <button
               className="btn btn-primary"
               onClick={handleApprove}
