@@ -7,6 +7,7 @@ import { CourseModule } from './course/course.module';
 import { SubmissionsModule } from './submissions/submissions.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { AiModule } from './ai/ai.module';
+import { ExportModule } from './export/export.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AiModule } from './ai/ai.module';
     SubmissionsModule,
     TelegramModule,
     AiModule,
+    ExportModule,
   ],
 })
 export class AppModule {}

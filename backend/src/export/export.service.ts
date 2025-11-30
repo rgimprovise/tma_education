@@ -1,8 +1,25 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ExportType, ExportFormat } from './dto/export-params.dto';
+import { ExportFormat } from './dto/export-params.dto';
 import { SubmissionExportRow } from './dto/submission-export-row.dto';
 import { UserProgressExportRow } from './dto/user-progress-export-row.dto';
+
+/**
+ * Опции для экспорта сдач
+ */
+export interface SubmissionExportOptions {
+  moduleId?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+}
+
+/**
+ * Опции для экспорта прогресса пользователей
+ */
+export interface UserProgressExportOptions {
+  dateFrom?: Date;
+  dateTo?: Date;
+}
 
 /**
  * ExportService - сервис для экспорта данных в различных форматах
@@ -27,24 +44,16 @@ export class ExportService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Экспортировать данные по курсу
+   * Построить экспорт сырых данных по сдачам
    * 
-   * @param courseId - ID курса (обязательный)
-   * @param moduleId - ID модуля (опционально, фильтр)
-   * @param dateFrom - Начальная дата (опционально)
-   * @param dateTo - Конечная дата (опционально)
-   * @param type - Тип экспорта (SUBMISSIONS или USER_PROGRESS)
-   * @param format - Формат экспорта (CSV, TSV, JSON)
-   * @returns Строка с данными в выбранном формате
+   * @param courseId - ID курса
+   * @param options - Опции фильтрации (moduleId, dateFrom, dateTo)
+   * @returns Массив строк экспорта SubmissionExportRow
    */
-  async exportData(
+  async buildSubmissionExport(
     courseId: string,
-    moduleId: string | undefined,
-    dateFrom: string | undefined,
-    dateTo: string | undefined,
-    type: ExportType,
-    format: ExportFormat,
-  ): Promise<string> {
+    options: SubmissionExportOptions = {},
+  ): Promise<SubmissionExportRow[]> {
     // Проверяем, что курс существует
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
@@ -56,9 +65,9 @@ export class ExportService {
     }
 
     // Проверяем модуль, если указан
-    if (moduleId) {
+    if (options.moduleId) {
       const module = await this.prisma.courseModule.findUnique({
-        where: { id: moduleId },
+        where: { id: options.moduleId },
         select: { id: true, courseId: true },
       });
 
@@ -71,31 +80,6 @@ export class ExportService {
       }
     }
 
-    // Парсим даты
-    const fromDate = dateFrom ? new Date(dateFrom) : undefined;
-    const toDate = dateTo ? new Date(dateTo) : undefined;
-
-    // Выбираем тип экспорта
-    if (type === ExportType.SUBMISSIONS) {
-      const rows = await this.exportSubmissions(courseId, moduleId, fromDate, toDate);
-      return this.formatData(rows, format);
-    } else if (type === ExportType.USER_PROGRESS) {
-      const rows = await this.exportUserProgress(courseId, moduleId, fromDate, toDate);
-      return this.formatData(rows, format);
-    } else {
-      throw new BadRequestException(`Unsupported export type: ${type}`);
-    }
-  }
-
-  /**
-   * Экспортировать сырые данные по сдачам
-   */
-  private async exportSubmissions(
-    courseId: string,
-    moduleId: string | undefined,
-    dateFrom: Date | undefined,
-    dateTo: Date | undefined,
-  ): Promise<SubmissionExportRow[]> {
     // Строим фильтр для Prisma
     const where: any = {
       module: {
@@ -103,17 +87,17 @@ export class ExportService {
       },
     };
 
-    if (moduleId) {
-      where.moduleId = moduleId;
+    if (options.moduleId) {
+      where.moduleId = options.moduleId;
     }
 
-    if (dateFrom || dateTo) {
+    if (options.dateFrom || options.dateTo) {
       where.createdAt = {};
-      if (dateFrom) {
-        where.createdAt.gte = dateFrom;
+      if (options.dateFrom) {
+        where.createdAt.gte = options.dateFrom;
       }
-      if (dateTo) {
-        where.createdAt.lte = dateTo;
+      if (options.dateTo) {
+        where.createdAt.lte = options.dateTo;
       }
     }
 
@@ -170,15 +154,27 @@ export class ExportService {
       );
 
       // Определяем answerTextOrTranscript
+      // ПРИМЕЧАНИЕ: В текущей модели Submission.answerText содержит:
+      // - Для TEXT: текст ответа напрямую
+      // - Для AUDIO/VIDEO: транскрипт после распознавания через Whisper (если был обработан)
+      // - Для FILE: null
+      // 
+      // Экспорт ограничен текстовыми ответами и транскриптами аудио/видео.
+      // Если транскрипта нет, поле будет пустым или содержать метку типа файла.
       let answerTextOrTranscript = '';
       if (submission.answerType === 'TEXT') {
+        // Текстовый ответ - используем напрямую
         answerTextOrTranscript = submission.answerText || '';
       } else if (submission.answerType === 'AUDIO' || submission.answerType === 'VIDEO') {
-        // Для аудио/видео используем транскрипт, если есть
-        answerTextOrTranscript = submission.answerText || `[${submission.answerType}_FILE]`;
+        // Для аудио/видео: если есть транскрипт (после обработки через Whisper), используем его
+        // Если транскрипта нет - оставляем пустым или ставим метку
+        // В будущем можно добавить логику повторной транскрипции для экспорта
+        answerTextOrTranscript = submission.answerText || '';
+        // Если транскрипта нет, можно оставить пустым для ИИ-анализа
+        // или добавить метку: `[${submission.answerType}_NO_TRANSCRIPT]`
       } else {
-        // Для FILE
-        answerTextOrTranscript = '[FILE]';
+        // Для FILE - текстового контента нет
+        answerTextOrTranscript = '';
       }
 
       return {
@@ -215,68 +211,79 @@ export class ExportService {
   }
 
   /**
-   * Экспортировать агрегированный прогресс пользователей
+   * Построить экспорт агрегированного прогресса пользователей
+   * 
+   * @param courseId - ID курса
+   * @param options - Опции фильтрации (dateFrom, dateTo)
+   * @returns Массив строк экспорта UserProgressExportRow
    */
-  private async exportUserProgress(
+  async buildUserProgressExport(
     courseId: string,
-    moduleId: string | undefined,
-    dateFrom: Date | undefined,
-    dateTo: Date | undefined,
+    options: UserProgressExportOptions = {},
   ): Promise<UserProgressExportRow[]> {
-    // Получаем курс с модулями
+    // Проверяем, что курс существует
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
-      include: {
-        modules: {
-          where: moduleId ? { id: moduleId } : undefined,
-          include: {
-            steps: {
-              where: {
-                isRequired: true, // Только обязательные шаги для подсчёта modulesCount
-              },
-            },
-            enrollments: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    position: true,
-                    role: true,
-                    createdAt: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: { index: 'asc' },
-        },
-      },
+      select: { id: true, title: true },
     });
 
     if (!course) {
       throw new NotFoundException('Course not found');
     }
 
-    // Получаем все сдачи по курсу/модулю
+    // Получаем все модули курса с обязательными шагами
+    const modules = await this.prisma.courseModule.findMany({
+      where: { courseId: courseId },
+      include: {
+        steps: {
+          where: {
+            isRequired: true, // Только обязательные шаги для подсчёта modulesCount
+          },
+          select: {
+            id: true,
+          },
+        },
+      },
+      orderBy: { index: 'asc' },
+    });
+
+    // Подсчитываем обязательные модули (модули с хотя бы одним обязательным шагом)
+    const requiredModules = modules.filter((m) => m.steps.length > 0);
+    const modulesCount = requiredModules.length;
+
+    // Получаем все enrollments по курсу
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: {
+        moduleId: { in: modules.map((m) => m.id) },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            position: true,
+            role: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    // Получаем все сдачи по курсу с фильтрацией по датам
     const submissionsWhere: any = {
       module: {
         courseId: courseId,
       },
     };
 
-    if (moduleId) {
-      submissionsWhere.moduleId = moduleId;
-    }
-
-    if (dateFrom || dateTo) {
+    if (options.dateFrom || options.dateTo) {
       submissionsWhere.createdAt = {};
-      if (dateFrom) {
-        submissionsWhere.createdAt.gte = dateFrom;
+      if (options.dateFrom) {
+        submissionsWhere.createdAt.gte = options.dateFrom;
       }
-      if (dateTo) {
-        submissionsWhere.createdAt.lte = dateTo;
+      if (options.dateTo) {
+        submissionsWhere.createdAt.lte = options.dateTo;
       }
     }
 
@@ -297,7 +304,16 @@ export class ExportService {
       orderBy: { createdAt: 'asc' },
     });
 
-    // Группируем по пользователям
+    // Группируем enrollments по пользователям
+    const enrollmentsByUser = new Map<string, typeof enrollments>();
+    enrollments.forEach((enrollment) => {
+      if (!enrollmentsByUser.has(enrollment.userId)) {
+        enrollmentsByUser.set(enrollment.userId, []);
+      }
+      enrollmentsByUser.get(enrollment.userId)!.push(enrollment);
+    });
+
+    // Группируем submissions по пользователям
     const submissionsByUser = new Map<string, typeof allSubmissions>();
     allSubmissions.forEach((submission) => {
       if (!submissionsByUser.has(submission.userId)) {
@@ -306,8 +322,12 @@ export class ExportService {
       submissionsByUser.get(submission.userId)!.push(submission);
     });
 
-    // Получаем уникальных пользователей
-    const uniqueUserIds = Array.from(submissionsByUser.keys());
+    // Получаем уникальных пользователей (из enrollments, так как они точно есть в курсе)
+    const uniqueUserIds = Array.from(new Set([
+      ...enrollmentsByUser.keys(),
+      ...submissionsByUser.keys(),
+    ]));
+    
     const users = await this.prisma.user.findMany({
       where: {
         id: { in: uniqueUserIds },
@@ -322,18 +342,10 @@ export class ExportService {
       },
     });
 
-    // Подсчитываем обязательные модули
-    const requiredModules = course.modules.filter((m) =>
-      m.steps.some((s) => s.isRequired),
-    );
-    const modulesCount = requiredModules.length;
-
     // Формируем строки экспорта
     return users.map((user) => {
       const userSubmissions = submissionsByUser.get(user.id) || [];
-      const userEnrollments = course.modules.flatMap((m) =>
-        m.enrollments.filter((e) => e.userId === user.id),
-      );
+      const userEnrollments = enrollmentsByUser.get(user.id) || [];
 
       // Подсчитываем завершённые модули
       const completedModulesCount = userEnrollments.filter(
@@ -348,8 +360,9 @@ export class ExportService {
         .map((s) => s.curatorScore)
         .filter((score): score is number => score !== null && score !== undefined);
 
+      // Количество возвратов: статус CURATOR_RETURNED или resubmissionRequested = true
       const returnsCount = userSubmissions.filter(
-        (s) => s.status === 'CURATOR_RETURNED',
+        (s) => s.status === 'CURATOR_RETURNED' || s.resubmissionRequested,
       ).length;
       const approvedCount = userSubmissions.filter(
         (s) => s.status === 'CURATOR_APPROVED',
@@ -405,8 +418,12 @@ export class ExportService {
 
   /**
    * Форматировать данные в выбранный формат
+   * 
+   * @param rows - Массив строк экспорта
+   * @param format - Формат (CSV, TSV, JSON)
+   * @returns Строка с данными в выбранном формате
    */
-  private formatData(rows: SubmissionExportRow[] | UserProgressExportRow[], format: ExportFormat): string {
+  formatData(rows: SubmissionExportRow[] | UserProgressExportRow[], format: ExportFormat): string {
     if (rows.length === 0) {
       return format === ExportFormat.JSON ? '[]' : '';
     }
