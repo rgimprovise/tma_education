@@ -272,7 +272,23 @@ export class SubmissionsService {
   async findById(id: string): Promise<any> {
     const submission = await this.prisma.submission.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        stepId: true,
+        moduleId: true,
+        answerText: true,
+        answerFileId: true,
+        answerType: true, // ← КРИТИЧНО! Добавлено явно
+        aiScore: true,
+        aiFeedback: true,
+        curatorScore: true,
+        curatorFeedback: true,
+        status: true,
+        resubmissionRequested: true,
+        resubmissionRequestedAt: true,
+        createdAt: true,
+        updatedAt: true,
         step: {
           select: {
             id: true,
