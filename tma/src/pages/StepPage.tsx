@@ -135,6 +135,10 @@ export function StepPage() {
     }
 
     // 2. Проверяем, не отправлен ли уже ответ
+    // Разрешаем отправку, если:
+    // - submission отсутствует (null) - можно отправлять
+    // - submission есть, но статус CURATOR_RETURNED - можно переотправить
+    // Блокируем, если submission есть и статус не CURATOR_RETURNED
     if (step.submission && step.submission.status !== 'CURATOR_RETURNED') {
       const message = 'Вы уже отправили ответ на это задание. Дождитесь проверки куратора.';
       setError(message);
@@ -188,6 +192,14 @@ export function StepPage() {
         answerText,
         answerType: step.expectedAnswer || 'TEXT',
       });
+
+      // Перезагружаем данные шага, чтобы обновить submission
+      const response = await api.get(`/course/steps/${stepId}`);
+      setStep(response.data);
+      
+      // Очищаем поля ответа
+      setAnswer('');
+      setFormAnswers({});
 
       // Показываем уведомление об успехе
       if (window.Telegram?.WebApp) {
@@ -485,7 +497,9 @@ export function StepPage() {
               )}
 
               {/* Для LEARNER: кнопка запроса повторной отправки */}
+              {/* Показываем только если submission существует, не одобрена, и запрос еще не отправлен */}
               {isLearner && 
+               step.submission &&
                step.submission.status !== 'CURATOR_APPROVED' && 
                !step.submission.resubmissionRequested && (
                 <button
