@@ -69,7 +69,7 @@ export class SubmissionsService {
       throw new ForbiddenException('Module is not available. Please wait for curator to unlock it.');
     }
 
-    // 5. Проверяем, что пользователь ещё не сдавал этот шаг
+    // 5. Проверяем, существует ли submission для этого шага
     const existingSubmission = await this.prisma.submission.findFirst({
       where: {
         userId: data.userId,
@@ -77,7 +77,9 @@ export class SubmissionsService {
       },
     });
 
-    if (existingSubmission) {
+    // Если submission существует и статус не CURATOR_RETURNED - блокируем
+    // Если статус CURATOR_RETURNED - разрешаем обновление (ученик переделывает задание)
+    if (existingSubmission && existingSubmission.status !== 'CURATOR_RETURNED') {
       throw new BadRequestException('You have already submitted this step');
     }
 
@@ -97,45 +99,95 @@ export class SubmissionsService {
       throw new BadRequestException(`File ID is required for ${data.answerType} type`);
     }
 
-    // 8. Создаём сдачу
-    const submission = await this.prisma.submission.create({
-      data: {
-        userId: data.userId,
-        stepId: data.stepId,
-        moduleId: data.moduleId,
-        answerText: data.answerText,
-        answerFileId: data.answerFileId,
-        answerType: data.answerType,
-        status: 'SENT',
-      },
-      include: {
-        step: {
-          select: {
-            id: true,
-            title: true,
-            index: true,
-            type: true,
-            requiresAiReview: true,
-            content: true,
-            maxScore: true,
+    // 8. Создаём или обновляем сдачу
+    // Если submission существует со статусом CURATOR_RETURNED - обновляем (ученик переделывает задание)
+    // Иначе создаём новую
+    let submission;
+    if (existingSubmission && existingSubmission.status === 'CURATOR_RETURNED') {
+      // Обновляем существующую submission (ученик переделывает задание после возврата)
+      submission = await this.prisma.submission.update({
+        where: { id: existingSubmission.id },
+        data: {
+          answerText: data.answerText,
+          answerFileId: data.answerFileId,
+          answerType: data.answerType,
+          status: 'SENT', // Сбрасываем статус на SENT для новой проверки
+          // Очищаем оценки и комментарии куратора (они сохранены в истории)
+          curatorScore: null,
+          curatorFeedback: null,
+          // Очищаем оценки ИИ (будет новая проверка)
+          aiScore: null,
+          aiFeedback: null,
+        },
+        include: {
+          step: {
+            select: {
+              id: true,
+              title: true,
+              index: true,
+              type: true,
+              requiresAiReview: true,
+              content: true,
+              maxScore: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          module: {
+            select: {
+              id: true,
+              index: true,
+              title: true,
+            },
           },
         },
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
+      });
+    } else {
+      // Создаём новую submission
+      submission = await this.prisma.submission.create({
+        data: {
+          userId: data.userId,
+          stepId: data.stepId,
+          moduleId: data.moduleId,
+          answerText: data.answerText,
+          answerFileId: data.answerFileId,
+          answerType: data.answerType,
+          status: 'SENT',
+        },
+        include: {
+          step: {
+            select: {
+              id: true,
+              title: true,
+              index: true,
+              type: true,
+              requiresAiReview: true,
+              content: true,
+              maxScore: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          module: {
+            select: {
+              id: true,
+              index: true,
+              title: true,
+            },
           },
         },
-        module: {
-          select: {
-            id: true,
-            index: true,
-            title: true,
-          },
-        },
-      },
-    });
+      });
+    }
 
     // 9. Если требуется проверка ИИ, запускаем асинхронно
     if (submission.step.requiresAiReview) {
@@ -360,12 +412,40 @@ export class SubmissionsService {
       }
     }
 
+    // Если возвращаем на доработку - сохраняем текущий ответ в историю
+    if (status === 'CURATOR_RETURNED') {
+      // Сохраняем текущий ответ в историю перед очисткой
+      await this.prisma.submissionHistory.create({
+        data: {
+          submissionId: id,
+          answerText: submission.answerText,
+          answerFileId: submission.answerFileId,
+          answerType: submission.answerType,
+          aiScore: submission.aiScore,
+          aiFeedback: submission.aiFeedback,
+          curatorScore: submission.curatorScore,
+          curatorFeedback: submission.curatorFeedback,
+          status: submission.status,
+          reason: 'RETURNED',
+        },
+      });
+    }
+
     // Подготавливаем данные для обновления
     const updateData: any = {
       status,
       curatorScore,
       curatorFeedback,
     };
+
+    // Если возвращаем на доработку - очищаем ответ, чтобы ученик мог сразу переделать
+    if (status === 'CURATOR_RETURNED') {
+      updateData.answerText = null;
+      updateData.answerFileId = null;
+      // Сбрасываем оценки ИИ, так как ответ будет новый
+      updateData.aiScore = null;
+      updateData.aiFeedback = null;
+    }
 
     // Если возвращаем на доработку или одобряем - сбрасываем запрос на повторную отправку
     // (запрос выполнен: куратор разрешил пересдачу)
@@ -589,7 +669,26 @@ export class SubmissionsService {
       throw new BadRequestException('Ученик не запрашивал повторную отправку для этой сдачи');
     }
 
-    // 3. Удаляем submission (очищаем ответ)
+    // 3. Сохраняем текущий ответ в историю перед удалением
+    await this.prisma.submissionHistory.create({
+      data: {
+        submissionId: submissionId,
+        answerText: submission.answerText,
+        answerFileId: submission.answerFileId,
+        answerType: submission.answerType,
+        aiScore: submission.aiScore,
+        aiFeedback: submission.aiFeedback,
+        curatorScore: submission.curatorScore,
+        curatorFeedback: submission.curatorFeedback,
+        status: submission.status,
+        reason: 'RESUBMISSION',
+      },
+    }).catch((error) => {
+      // Если submission уже удалена или ошибка - логируем, но не блокируем процесс
+      console.error('Failed to save submission history:', error);
+    });
+
+    // 4. Удаляем submission (очищаем ответ)
     await this.prisma.submission.delete({
       where: { id: submissionId },
     });
