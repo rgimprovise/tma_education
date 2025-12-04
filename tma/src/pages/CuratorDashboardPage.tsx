@@ -21,6 +21,8 @@ interface Learner {
   }>;
   totalSubmissions: number;
   pendingSubmissions: number;
+  returnedSubmissions: number;
+  resubmissionRequestedSubmissions: number;
 }
 
 export function CuratorDashboardPage() {
@@ -95,11 +97,23 @@ export function CuratorDashboardPage() {
                         <div className="card-subtitle">{learner.position}</div>
                       )}
                     </div>
-                    {learner.pendingSubmissions > 0 && (
-                      <div className="pending-badge">
-                        {learner.pendingSubmissions}
-                      </div>
-                    )}
+                    <div className="learner-badges">
+                      {learner.pendingSubmissions > 0 && (
+                        <div className="pending-badge" title="Сдачи на проверке">
+                          ⏳ {learner.pendingSubmissions}
+                        </div>
+                      )}
+                      {learner.returnedSubmissions > 0 && (
+                        <div className="returned-badge" title="Возвращено на доработку">
+                          🔄 {learner.returnedSubmissions}
+                        </div>
+                      )}
+                      {learner.resubmissionRequestedSubmissions > 0 && (
+                        <div className="resubmission-badge" title="Запрос на повторную отправку">
+                          ❓ {learner.resubmissionRequestedSubmissions}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="learner-stats">

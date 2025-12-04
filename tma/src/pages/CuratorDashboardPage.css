@@ -60,10 +60,40 @@
   white-space: nowrap;
 }
 
+/* Контейнер для бейджей */
+.learner-badges {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 /* Бейдж на проверке */
 .pending-badge {
-  flex-shrink: 0;
   background-color: #ff9800;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Бейдж возвращено на доработку */
+.returned-badge {
+  background-color: #f44336;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Бейдж запрос на повторную отправку */
+.resubmission-badge {
+  background-color: #2196f3;
   color: white;
   padding: 4px 10px;
   border-radius: 12px;

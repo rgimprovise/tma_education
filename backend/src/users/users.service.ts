@@ -85,6 +85,7 @@ export class UsersService {
       select: {
         userId: true,
         status: true,
+        resubmissionRequested: true,
       },
     });
 
@@ -112,6 +113,12 @@ export class UsersService {
       const pendingSubmissions = userSubmissions.filter(
         (s) => s.status === 'SENT' || s.status === 'AI_REVIEWED',
       ).length;
+      const returnedSubmissions = userSubmissions.filter(
+        (s) => s.status === 'CURATOR_RETURNED',
+      ).length;
+      const resubmissionRequestedSubmissions = userSubmissions.filter(
+        (s) => s.resubmissionRequested === true,
+      ).length;
 
       return {
         ...learner,
@@ -124,6 +131,8 @@ export class UsersService {
         })),
         totalSubmissions: userSubmissions.length,
         pendingSubmissions,
+        returnedSubmissions,
+        resubmissionRequestedSubmissions,
       };
     });
   }

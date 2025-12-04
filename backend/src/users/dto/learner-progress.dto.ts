@@ -25,6 +25,8 @@ export class LearnerProgressDto {
   }>;
   totalSubmissions: number;
   pendingSubmissions: number; // Сдачи на проверке
+  returnedSubmissions: number; // Сдачи возвращены на доработку
+  resubmissionRequestedSubmissions: number; // Запросы на повторную отправку
 }
 
 /**
