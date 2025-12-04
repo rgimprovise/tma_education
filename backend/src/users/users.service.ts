@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
+import { CuratorStatsDto } from './dto/curator-stats.dto';
 
 interface CreateUserDto {
   telegramId: string;
@@ -256,6 +257,118 @@ export class UsersService {
     await this.prisma.user.delete({
       where: { id: userId },
     });
+  }
+
+  /**
+   * Получить статистику для куратора
+   */
+  async getCuratorStats(): Promise<CuratorStatsDto> {
+    // Получаем всех учеников
+    const learners = await this.prisma.user.findMany({
+      where: { role: 'LEARNER' },
+    });
+
+    // Получаем все enrollments
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: {
+        user: { role: 'LEARNER' },
+      },
+    });
+
+    // Получаем все submissions
+    const submissions = await this.prisma.submission.findMany({
+      where: {
+        user: { role: 'LEARNER' },
+      },
+      include: {
+        user: {
+          select: { id: true },
+        },
+      },
+    });
+
+    // Получаем все модули
+    const modules = await this.prisma.courseModule.findMany();
+
+    // Подсчитываем статистику
+    const totalLearners = learners.length;
+    const activeLearners = new Set(submissions.map((s) => s.userId)).size;
+    
+    // Ученики, завершившие курс (все модули COMPLETED)
+    const learnersWithAllCompleted = learners.filter((learner) => {
+      const learnerEnrollments = enrollments.filter((e) => e.userId === learner.id);
+      return learnerEnrollments.length > 0 && 
+             learnerEnrollments.every((e) => e.status === 'COMPLETED');
+    });
+    const completedLearners = learnersWithAllCompleted.length;
+
+    const totalModules = modules.length;
+    const completedModulesCount = enrollments.filter((e) => e.status === 'COMPLETED').length;
+    const averageCompletionRate = totalModules > 0 && totalLearners > 0
+      ? (completedModulesCount / (totalModules * totalLearners)) * 100 
+      : 0;
+
+    const totalSubmissions = submissions.length;
+    const pendingSubmissions = submissions.filter(
+      (s) => s.status === 'SENT' || s.status === 'AI_REVIEWED',
+    ).length;
+    const approvedSubmissions = submissions.filter(
+      (s) => s.status === 'CURATOR_APPROVED',
+    ).length;
+    const returnedSubmissions = submissions.filter(
+      (s) => s.status === 'CURATOR_RETURNED',
+    ).length;
+    const resubmissionRequestedSubmissions = submissions.filter(
+      (s) => s.resubmissionRequested === true,
+    ).length;
+
+    // Средние оценки
+    const aiScores = submissions.filter((s) => s.aiScore !== null).map((s) => s.aiScore!);
+    const curatorScores = submissions.filter((s) => s.curatorScore !== null).map((s) => s.curatorScore!);
+    const averageAiScore = aiScores.length > 0 
+      ? aiScores.reduce((sum, score) => sum + score, 0) / aiScores.length 
+      : null;
+    const averageCuratorScore = curatorScores.length > 0 
+      ? curatorScores.reduce((sum, score) => sum + score, 0) / curatorScores.length 
+      : null;
+
+    // Процент возвратов
+    const returnRate = totalSubmissions > 0 
+      ? (returnedSubmissions / totalSubmissions) * 100 
+      : 0;
+
+    // Статистика по прогрессу
+    const learnersByProgress = {
+      notStarted: learners.filter((learner) => {
+        const learnerEnrollments = enrollments.filter((e) => e.userId === learner.id);
+        return learnerEnrollments.length === 0 || 
+               learnerEnrollments.every((e) => e.status === 'LOCKED');
+      }).length,
+      inProgress: learners.filter((learner) => {
+        const learnerEnrollments = enrollments.filter((e) => e.userId === learner.id);
+        return learnerEnrollments.some((e) => e.status === 'IN_PROGRESS') &&
+               !learnerEnrollments.every((e) => e.status === 'COMPLETED');
+      }).length,
+      completed: completedLearners,
+    };
+
+    return {
+      totalLearners,
+      activeLearners,
+      completedLearners,
+      totalModules,
+      completedModulesCount,
+      averageCompletionRate,
+      totalSubmissions,
+      pendingSubmissions,
+      approvedSubmissions,
+      returnedSubmissions,
+      resubmissionRequestedSubmissions,
+      averageAiScore,
+      averageCuratorScore,
+      returnRate,
+      learnersByProgress,
+    };
   }
 }
 

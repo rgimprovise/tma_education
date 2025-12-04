@@ -4,6 +4,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UsersService } from './users.service';
 import { LearnerProgressDto, LearnerDetailDto } from './dto/learner-progress.dto';
+import { CuratorStatsDto } from './dto/curator-stats.dto';
 import { UserRole } from '@prisma/client';
 
 /**
@@ -43,6 +44,16 @@ export class AdminController {
   @Roles(UserRole.CURATOR, UserRole.ADMIN)
   async deleteUser(@Param('id') id: string): Promise<void> {
     await this.usersService.deleteUser(id);
+  }
+
+  /**
+   * GET /admin/stats
+   * Получить статистику для куратора
+   */
+  @Get('stats')
+  @Roles(UserRole.CURATOR, UserRole.ADMIN)
+  async getCuratorStats() {
+    return this.usersService.getCuratorStats();
   }
 }
 

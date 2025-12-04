@@ -36,22 +36,27 @@ export function CuratorDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('name');
   const [filterBy, setFilterBy] = useState<FilterOption>('all');
+  const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
-    const loadLearners = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
-        const response = await api.get('/admin/learners');
-        setLearners(response.data);
+        const [learnersResponse, statsResponse] = await Promise.all([
+          api.get('/admin/learners'),
+          api.get('/admin/stats'),
+        ]);
+        setLearners(learnersResponse.data);
+        setStats(statsResponse.data);
       } catch (err: any) {
-        console.error('Failed to load learners:', err);
-        setError(err.response?.data?.message || 'Ошибка загрузки участников');
+        console.error('Failed to load data:', err);
+        setError(err.response?.data?.message || 'Ошибка загрузки данных');
       } finally {
         setLoading(false);
       }
     };
 
-    loadLearners();
+    loadData();
   }, []);
 
   // Функции сортировки и фильтрации
@@ -125,6 +130,77 @@ export function CuratorDashboardPage() {
         <h1 className="page-title">Ученики</h1>
         <p className="page-subtitle">Добро пожаловать, {user?.firstName}!</p>
       </div>
+
+      {/* Микро дэшборд со статистикой */}
+      {stats && (
+        <div className="stats-dashboard">
+          <h2 className="section-title">Статистика</h2>
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-icon-large">👥</div>
+              <div className="stat-content">
+                <div className="stat-value">{stats.totalLearners}</div>
+                <div className="stat-label">Всего учеников</div>
+                <div className="stat-details">
+                  Активных: {stats.activeLearners} | Завершили: {stats.completedLearners}
+                </div>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon-large">📊</div>
+              <div className="stat-content">
+                <div className="stat-value">{stats.totalSubmissions}</div>
+                <div className="stat-label">Всего сдач</div>
+                <div className="stat-details">
+                  На проверке: {stats.pendingSubmissions} | Одобрено: {stats.approvedSubmissions}
+                </div>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon-large">🔄</div>
+              <div className="stat-content">
+                <div className="stat-value">{stats.returnedSubmissions}</div>
+                <div className="stat-label">Возвратов</div>
+                <div className="stat-details">
+                  Процент: {stats.returnRate.toFixed(1)}%
+                </div>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon-large">⭐</div>
+              <div className="stat-content">
+                <div className="stat-value">
+                  {stats.averageCuratorScore !== null ? stats.averageCuratorScore.toFixed(1) : '—'}
+                </div>
+                <div className="stat-label">Средняя оценка</div>
+                <div className="stat-details">
+                  ИИ: {stats.averageAiScore !== null ? stats.averageAiScore.toFixed(1) : '—'}
+                </div>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon-large">📈</div>
+              <div className="stat-content">
+                <div className="stat-value">{stats.averageCompletionRate.toFixed(1)}%</div>
+                <div className="stat-label">Завершение курса</div>
+                <div className="stat-details">
+                  Модулей завершено: {stats.completedModulesCount}
+                </div>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon-large">📋</div>
+              <div className="stat-content">
+                <div className="stat-value">{stats.learnersByProgress.inProgress}</div>
+                <div className="stat-label">В процессе</div>
+                <div className="stat-details">
+                  Не начали: {stats.learnersByProgress.notStarted} | Завершили: {stats.learnersByProgress.completed}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Фильтры и сортировка */}
       <div className="filters-section">
