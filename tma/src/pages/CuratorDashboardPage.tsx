@@ -25,12 +25,17 @@ interface Learner {
   resubmissionRequestedSubmissions: number;
 }
 
+type SortOption = 'name' | 'progress' | 'submissions' | 'pending' | 'returned' | 'resubmission';
+type FilterOption = 'all' | 'pending' | 'returned' | 'resubmission' | 'completed';
+
 export function CuratorDashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [learners, setLearners] = useState<Learner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>('name');
+  const [filterBy, setFilterBy] = useState<FilterOption>('all');
 
   useEffect(() => {
     const loadLearners = async () => {
@@ -48,6 +53,55 @@ export function CuratorDashboardPage() {
 
     loadLearners();
   }, []);
+
+  // Функции сортировки и фильтрации
+  const getFilteredAndSortedLearners = () => {
+    let filtered = [...learners];
+
+    // Фильтрация
+    if (filterBy === 'pending') {
+      filtered = filtered.filter((l) => l.pendingSubmissions > 0);
+    } else if (filterBy === 'returned') {
+      filtered = filtered.filter((l) => l.returnedSubmissions > 0);
+    } else if (filterBy === 'resubmission') {
+      filtered = filtered.filter((l) => l.resubmissionRequestedSubmissions > 0);
+    } else if (filterBy === 'completed') {
+      filtered = filtered.filter((l) => {
+        const completedModules = l.enrollments.filter((e) => e.status === 'COMPLETED').length;
+        return completedModules === l.enrollments.length && l.enrollments.length > 0;
+      });
+    }
+
+    // Сортировка
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'name': {
+          const nameA = `${a.firstName || ''} ${a.lastName || ''}`.trim() || 'Без имени';
+          const nameB = `${b.firstName || ''} ${b.lastName || ''}`.trim() || 'Без имени';
+          return nameA.localeCompare(nameB, 'ru');
+        }
+        case 'progress': {
+          const progressA = a.enrollments.filter((e) => e.status === 'COMPLETED').length / Math.max(a.enrollments.length, 1);
+          const progressB = b.enrollments.filter((e) => e.status === 'COMPLETED').length / Math.max(b.enrollments.length, 1);
+          return progressB - progressA; // По убыванию
+        }
+        case 'submissions':
+          return b.totalSubmissions - a.totalSubmissions; // По убыванию
+        case 'pending':
+          return b.pendingSubmissions - a.pendingSubmissions; // По убыванию
+        case 'returned':
+          return b.returnedSubmissions - a.returnedSubmissions; // По убыванию
+        case 'resubmission':
+          return b.resubmissionRequestedSubmissions - a.resubmissionRequestedSubmissions; // По убыванию
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  };
+
+  const displayedLearners = getFilteredAndSortedLearners();
 
   if (loading) {
     return (
@@ -72,14 +126,51 @@ export function CuratorDashboardPage() {
         <p className="page-subtitle">Добро пожаловать, {user?.firstName}!</p>
       </div>
 
-        <div className="learners-list">
-          <h2 className="section-title">Участники ({learners.length}):</h2>
-          {learners.length === 0 ? (
-            <div className="empty-state">
-              <p>Нет участников</p>
-            </div>
-          ) : (
-            learners.map((learner) => {
+      {/* Фильтры и сортировка */}
+      <div className="filters-section">
+        <div className="filter-group">
+          <label htmlFor="sort-select" className="filter-label">Сортировка:</label>
+          <select
+            id="sort-select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="filter-select"
+          >
+            <option value="name">По имени</option>
+            <option value="progress">По прогрессу</option>
+            <option value="submissions">По количеству сдач</option>
+            <option value="pending">По сдачам на проверке</option>
+            <option value="returned">По возвратам</option>
+            <option value="resubmission">По запросам повторной отправки</option>
+          </select>
+        </div>
+        <div className="filter-group">
+          <label htmlFor="filter-select" className="filter-label">Фильтр:</label>
+          <select
+            id="filter-select"
+            value={filterBy}
+            onChange={(e) => setFilterBy(e.target.value as FilterOption)}
+            className="filter-select"
+          >
+            <option value="all">Все</option>
+            <option value="pending">С на проверке</option>
+            <option value="returned">С возвратами</option>
+            <option value="resubmission">С запросами</option>
+            <option value="completed">Завершившие курс</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="learners-list">
+        <h2 className="section-title">
+          Участники ({displayedLearners.length} из {learners.length}):
+        </h2>
+        {displayedLearners.length === 0 ? (
+          <div className="empty-state">
+            <p>Нет участников по выбранным фильтрам</p>
+          </div>
+        ) : (
+          displayedLearners.map((learner) => {
               const userName = `${learner.firstName || ''} ${learner.lastName || ''}`.trim() || 'Без имени';
               const completedModules = learner.enrollments.filter((e) => e.status === 'COMPLETED').length;
               const totalModules = learner.enrollments.length;
