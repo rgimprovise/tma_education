@@ -33,6 +33,8 @@ export function CourseDashboardPage() {
   const [unlockingModuleId, setUnlockingModuleId] = useState<string | null>(null);
   const [lockingModuleId, setLockingModuleId] = useState<string | null>(null);
   const [settingAutoUnlock, setSettingAutoUnlock] = useState<string | null>(null);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'tsv' | 'json'>('csv');
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   useEffect(() => {
     if (courseId) {
@@ -203,6 +205,70 @@ export function CourseDashboardPage() {
     }
   };
 
+  const handleExport = async (format: 'csv' | 'tsv' | 'json') => {
+    if (!courseId) return;
+
+    try {
+      setExportFormat(format);
+      setShowExportMenu(false);
+
+      // Получаем токен для авторизации
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Ошибка: токен не найден. Пожалуйста, войдите снова.');
+        return;
+      }
+
+      // Формируем URL для экспорта
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const exportUrl = `${API_URL}/admin/export/submissions?courseId=${courseId}&format=${format}`;
+
+      // Создаём скрытую ссылку для скачивания
+      const link = document.createElement('a');
+      link.href = exportUrl;
+      link.download = `submissions_export_${courseId}_${new Date().toISOString().split('T')[0]}.${format}`;
+      link.style.display = 'none';
+
+      // Добавляем токен в заголовки через fetch
+      const response = await fetch(exportUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Ошибка экспорта: ${response.statusText}`);
+      }
+
+      // Получаем blob и создаём URL для скачивания
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      link.href = blobUrl;
+
+      // Добавляем ссылку в DOM, кликаем и удаляем
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Освобождаем память
+      window.URL.revokeObjectURL(blobUrl);
+
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`✅ Данные экспортированы в формате ${format.toUpperCase()}`);
+      } else {
+        alert(`✅ Данные экспортированы в формате ${format.toUpperCase()}`);
+      }
+    } catch (err: any) {
+      console.error('Failed to export data:', err);
+      const errorMessage = err.message || 'Ошибка экспорта данных';
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`❌ ${errorMessage}`);
+      } else {
+        alert(`❌ ${errorMessage}`);
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="course-dashboard">
@@ -319,20 +385,98 @@ export function CourseDashboardPage() {
         </div>
       </div>
 
-      {/* Кнопка для отправки отчёта в Telegram */}
+      {/* Кнопки для экспорта и отправки отчёта */}
       <div className="actions-section" style={{ marginBottom: '24px' }}>
-        <button 
-          className="btn btn-primary" 
-          onClick={handleSendReportToTelegram}
-          style={{ 
-            width: '100%',
-            padding: '12px 20px',
-            fontSize: '16px',
-            fontWeight: '600',
-          }}
-        >
-          📤 Отправить отчёт в Telegram
-        </button>
+        <div style={{ display: 'flex', gap: '12px', flexDirection: 'column' }}>
+          <button 
+            className="btn btn-primary" 
+            onClick={handleSendReportToTelegram}
+            style={{ 
+              width: '100%',
+              padding: '12px 20px',
+              fontSize: '16px',
+              fontWeight: '600',
+            }}
+          >
+            📤 Отправить отчёт в Telegram
+          </button>
+          
+          <div style={{ position: 'relative', width: '100%' }}>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              style={{ 
+                width: '100%',
+                padding: '12px 20px',
+                fontSize: '16px',
+                fontWeight: '600',
+              }}
+            >
+              📥 Экспорт данных {showExportMenu ? '▲' : '▼'}
+            </button>
+            
+            {showExportMenu && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: '4px',
+                backgroundColor: 'var(--tg-theme-bg-color, #ffffff)',
+                border: '1px solid var(--tg-theme-hint-color, rgba(0, 0, 0, 0.2))',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                zIndex: 1000,
+                overflow: 'hidden',
+              }}>
+                <button
+                  className="btn"
+                  onClick={() => handleExport('csv')}
+                  style={{
+                    width: '100%',
+                    padding: '12px 20px',
+                    textAlign: 'left',
+                    border: 'none',
+                    borderBottom: '1px solid var(--tg-theme-hint-color, rgba(0, 0, 0, 0.1))',
+                    backgroundColor: 'transparent',
+                    cursor: 'pointer',
+                  }}
+                >
+                  📄 CSV (Excel)
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => handleExport('tsv')}
+                  style={{
+                    width: '100%',
+                    padding: '12px 20px',
+                    textAlign: 'left',
+                    border: 'none',
+                    borderBottom: '1px solid var(--tg-theme-hint-color, rgba(0, 0, 0, 0.1))',
+                    backgroundColor: 'transparent',
+                    cursor: 'pointer',
+                  }}
+                >
+                  📄 TSV (Табуляция)
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => handleExport('json')}
+                  style={{
+                    width: '100%',
+                    padding: '12px 20px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    cursor: 'pointer',
+                  }}
+                >
+                  📄 JSON
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="modules-section">
