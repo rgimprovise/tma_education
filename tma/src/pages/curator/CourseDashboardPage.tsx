@@ -228,9 +228,10 @@ export function CourseDashboardPage() {
       setShowExportMenu(false);
 
       // Отправляем запрос на экспорт и отправку через Telegram
-      const response = await api.post('/admin/export/submissions/send-telegram', {
+      const response = await api.post('/admin/export/send-telegram', {
         courseId,
         format,
+        type: 'submissions',
       });
 
       if (window.Telegram?.WebApp) {

@@ -203,7 +203,7 @@ export class AdminExportController {
   }
 
   /**
-   * POST /admin/export/submissions/send-telegram
+   * POST /admin/export/send-telegram
    * Экспортировать данные по сдачам и отправить через Telegram
    * 
    * Body параметры:
@@ -212,8 +212,9 @@ export class AdminExportController {
    * - dateFrom (optional) - Начальная дата (ISO 8601)
    * - dateTo (optional) - Конечная дата (ISO 8601)
    * - format (optional) - Формат экспорта: csv, tsv, json (по умолчанию csv)
+   * - type (optional) - Тип экспорта: 'submissions' или 'user-progress' (по умолчанию 'submissions')
    */
-  @Post('submissions/send-telegram')
+  @Post('send-telegram')
   @Roles(UserRole.ADMIN, UserRole.CURATOR)
   async exportSubmissionsAndSendTelegram(
     @Request() req: any,
@@ -223,9 +224,10 @@ export class AdminExportController {
       dateFrom?: string;
       dateTo?: string;
       format?: string;
+      type?: 'submissions' | 'user-progress';
     },
   ) {
-    const { courseId, moduleId, dateFrom, dateTo, format = 'csv' } = body;
+    const { courseId, moduleId, dateFrom, dateTo, format = 'csv', type = 'submissions' } = body;
 
     if (!courseId) {
       throw new BadRequestException('courseId is required');
@@ -267,34 +269,56 @@ export class AdminExportController {
       throw new BadRequestException('Invalid dateTo format. Use ISO 8601 (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)');
     }
 
-    // Строим экспорт
-    const rows = await this.exportService.buildSubmissionExport(courseId, {
-      moduleId,
-      dateFrom: dateFromParsed,
-      dateTo: dateToParsed,
-    });
+    // Строим экспорт в зависимости от типа
+    let rows: any[];
+    let filename: string;
+    let caption: string;
+
+    if (type === 'user-progress') {
+      rows = await this.exportService.buildUserProgressExport(courseId, {
+        dateFrom: dateFromParsed,
+        dateTo: dateToParsed,
+      });
+      const dateStr = new Date().toISOString().split('T')[0];
+      const extension = exportFormat === ExportFormat.JSON ? 'json' : exportFormat;
+      filename = `экспорт_прогресса_${course.title.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_')}_${dateStr}.${extension}`;
+      caption = `📥 Экспорт прогресса участников\n\n` +
+        `Курс: ${course.title}\n` +
+        `Дата генерации: ${new Date().toLocaleDateString('ru-RU', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })}\n\n` +
+        `📊 Статистика:\n` +
+        `• Всего участников: ${rows.length}\n` +
+        `• Формат: ${exportFormat.toUpperCase()}`;
+    } else {
+      rows = await this.exportService.buildSubmissionExport(courseId, {
+        moduleId,
+        dateFrom: dateFromParsed,
+        dateTo: dateToParsed,
+      });
+      const dateStr = new Date().toISOString().split('T')[0];
+      const extension = exportFormat === ExportFormat.JSON ? 'json' : exportFormat;
+      filename = `экспорт_сдач_${course.title.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_')}_${dateStr}.${extension}`;
+      caption = `📥 Экспорт данных по сдачам\n\n` +
+        `Курс: ${course.title}\n` +
+        `Дата генерации: ${new Date().toLocaleDateString('ru-RU', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })}\n\n` +
+        `📊 Статистика:\n` +
+        `• Всего записей: ${rows.length}\n` +
+        `• Формат: ${exportFormat.toUpperCase()}`;
+    }
 
     // Форматируем данные
     const formattedData = this.exportService.formatData(rows, exportFormat);
-
-    // Формируем имя файла
-    const dateStr = new Date().toISOString().split('T')[0];
-    const extension = exportFormat === ExportFormat.JSON ? 'json' : exportFormat;
-    const filename = `экспорт_сдач_${course.title.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_')}_${dateStr}.${extension}`;
-
-    // Формируем подпись
-    const caption = `📥 Экспорт данных по сдачам\n\n` +
-      `Курс: ${course.title}\n` +
-      `Дата генерации: ${new Date().toLocaleDateString('ru-RU', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })}\n\n` +
-      `📊 Статистика:\n` +
-      `• Всего записей: ${rows.length}\n` +
-      `• Формат: ${exportFormat.toUpperCase()}`;
 
     // Отправляем через Telegram бот
     await this.telegramService.sendDocument(
