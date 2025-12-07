@@ -1,10 +1,14 @@
 import {
   Controller,
   Get,
+  Post,
   Query,
+  Body,
   Res,
+  Request,
   UseGuards,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -13,6 +17,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { ExportService } from './export.service';
 import { ExportFormat } from './dto/export-params.dto';
 import { UserRole } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { TelegramService } from '../telegram/telegram.service';
 
 /**
  * AdminExportController - контроллер для экспорта данных
@@ -23,7 +29,11 @@ import { UserRole } from '@prisma/client';
 @Controller('admin/export')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AdminExportController {
-  constructor(private exportService: ExportService) {}
+  constructor(
+    private exportService: ExportService,
+    private prisma: PrismaService,
+    private telegramService: TelegramService,
+  ) {}
 
   /**
    * GET /admin/export/submissions
@@ -190,6 +200,115 @@ export class AdminExportController {
     const dateStr = new Date().toISOString().split('T')[0];
     const extension = format === ExportFormat.JSON ? 'json' : format;
     return `${type}_export_course_${courseId}_${dateStr}.${extension}`;
+  }
+
+  /**
+   * POST /admin/export/submissions/send-telegram
+   * Экспортировать данные по сдачам и отправить через Telegram
+   * 
+   * Body параметры:
+   * - courseId (required) - ID курса
+   * - moduleId (optional) - ID модуля для фильтрации
+   * - dateFrom (optional) - Начальная дата (ISO 8601)
+   * - dateTo (optional) - Конечная дата (ISO 8601)
+   * - format (optional) - Формат экспорта: csv, tsv, json (по умолчанию csv)
+   */
+  @Post('submissions/send-telegram')
+  @Roles(UserRole.ADMIN, UserRole.CURATOR)
+  async exportSubmissionsAndSendTelegram(
+    @Request() req: any,
+    @Body() body: {
+      courseId: string;
+      moduleId?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      format?: string;
+    },
+  ) {
+    const { courseId, moduleId, dateFrom, dateTo, format = 'csv' } = body;
+
+    if (!courseId) {
+      throw new BadRequestException('courseId is required');
+    }
+
+    // Получаем текущего пользователя
+    const userId = req.user.id;
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { telegramId: true, firstName: true, lastName: true },
+    });
+
+    if (!user || !user.telegramId) {
+      throw new NotFoundException('User not found or has no Telegram ID');
+    }
+
+    // Получаем информацию о курсе
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { title: true },
+    });
+
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    // Валидация формата
+    const exportFormat = this.parseFormat(format);
+
+    // Парсим даты
+    const dateFromParsed = dateFrom ? new Date(dateFrom) : undefined;
+    const dateToParsed = dateTo ? new Date(dateTo) : undefined;
+
+    if (dateFrom && isNaN(dateFromParsed!.getTime())) {
+      throw new BadRequestException('Invalid dateFrom format. Use ISO 8601 (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)');
+    }
+
+    if (dateTo && isNaN(dateToParsed!.getTime())) {
+      throw new BadRequestException('Invalid dateTo format. Use ISO 8601 (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)');
+    }
+
+    // Строим экспорт
+    const rows = await this.exportService.buildSubmissionExport(courseId, {
+      moduleId,
+      dateFrom: dateFromParsed,
+      dateTo: dateToParsed,
+    });
+
+    // Форматируем данные
+    const formattedData = this.exportService.formatData(rows, exportFormat);
+
+    // Формируем имя файла
+    const dateStr = new Date().toISOString().split('T')[0];
+    const extension = exportFormat === ExportFormat.JSON ? 'json' : exportFormat;
+    const filename = `экспорт_сдач_${course.title.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_')}_${dateStr}.${extension}`;
+
+    // Формируем подпись
+    const caption = `📥 Экспорт данных по сдачам\n\n` +
+      `Курс: ${course.title}\n` +
+      `Дата генерации: ${new Date().toLocaleDateString('ru-RU', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })}\n\n` +
+      `📊 Статистика:\n` +
+      `• Всего записей: ${rows.length}\n` +
+      `• Формат: ${exportFormat.toUpperCase()}`;
+
+    // Отправляем через Telegram бот
+    await this.telegramService.sendDocument(
+      user.telegramId,
+      formattedData,
+      filename,
+      caption,
+    );
+
+    return {
+      success: true,
+      message: 'Экспорт отправлен в Telegram',
+      rowsCount: rows.length,
+    };
   }
 }
 

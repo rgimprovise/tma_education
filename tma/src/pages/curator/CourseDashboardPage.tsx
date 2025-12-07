@@ -227,55 +227,28 @@ export function CourseDashboardPage() {
     try {
       setShowExportMenu(false);
 
-      // Получаем токен для авторизации
-      const token = localStorage.getItem('token');
-      if (!token) {
-        alert('Ошибка: токен не найден. Пожалуйста, войдите снова.');
-        return;
-      }
-
-      // Формируем URL для экспорта
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const exportUrl = `${API_URL}/admin/export/submissions?courseId=${courseId}&format=${format}`;
-
-      // Создаём скрытую ссылку для скачивания
-      const link = document.createElement('a');
-      link.href = exportUrl;
-      link.download = `submissions_export_${courseId}_${new Date().toISOString().split('T')[0]}.${format}`;
-      link.style.display = 'none';
-
-      // Добавляем токен в заголовки через fetch
-      const response = await fetch(exportUrl, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+      // Отправляем запрос на экспорт и отправку через Telegram
+      const response = await api.post('/admin/export/submissions/send-telegram', {
+        courseId,
+        format,
       });
 
-      if (!response.ok) {
-        throw new Error(`Ошибка экспорта: ${response.statusText}`);
-      }
-
-      // Получаем blob и создаём URL для скачивания
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      link.href = blobUrl;
-
-      // Добавляем ссылку в DOM, кликаем и удаляем
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Освобождаем память
-      window.URL.revokeObjectURL(blobUrl);
-
       if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert(`✅ Данные экспортированы в формате ${format.toUpperCase()}`);
+        window.Telegram.WebApp.showAlert(
+          `✅ Экспорт отправлен в Telegram!\n\n` +
+          `Формат: ${format.toUpperCase()}\n` +
+          `Записей: ${response.data.rowsCount || 0}`
+        );
       } else {
-        alert(`✅ Данные экспортированы в формате ${format.toUpperCase()}`);
+        alert(
+          `✅ Экспорт отправлен в Telegram!\n\n` +
+          `Формат: ${format.toUpperCase()}\n` +
+          `Записей: ${response.data.rowsCount || 0}`
+        );
       }
     } catch (err: any) {
       console.error('Failed to export data:', err);
-      const errorMessage = err.message || 'Ошибка экспорта данных';
+      const errorMessage = err.response?.data?.message || err.message || 'Ошибка экспорта данных';
       if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.showAlert(`❌ ${errorMessage}`);
       } else {
