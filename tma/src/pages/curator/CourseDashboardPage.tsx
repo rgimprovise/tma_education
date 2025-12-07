@@ -33,7 +33,6 @@ export function CourseDashboardPage() {
   const [unlockingModuleId, setUnlockingModuleId] = useState<string | null>(null);
   const [lockingModuleId, setLockingModuleId] = useState<string | null>(null);
   const [settingAutoUnlock, setSettingAutoUnlock] = useState<string | null>(null);
-  const [exportFormat, setExportFormat] = useState<'csv' | 'tsv' | 'json'>('csv');
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   useEffect(() => {
@@ -226,7 +225,6 @@ export function CourseDashboardPage() {
     if (!courseId) return;
 
     try {
-      setExportFormat(format);
       setShowExportMenu(false);
 
       // Получаем токен для авторизации
