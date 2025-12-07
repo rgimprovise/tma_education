@@ -42,6 +42,23 @@ export function CourseDashboardPage() {
     }
   }, [courseId]);
 
+  // Закрытие меню экспорта при клике вне его
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showExportMenu && !target.closest('.export-menu-container')) {
+        setShowExportMenu(false);
+      }
+    };
+
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showExportMenu]);
+
   const loadCourseData = async () => {
     try {
       setLoading(true);
@@ -401,7 +418,7 @@ export function CourseDashboardPage() {
             📤 Отправить отчёт в Telegram
           </button>
           
-          <div style={{ position: 'relative', width: '100%' }}>
+          <div className="export-menu-container" style={{ position: 'relative', width: '100%' }}>
             <button 
               className="btn btn-secondary" 
               onClick={() => setShowExportMenu(!showExportMenu)}
