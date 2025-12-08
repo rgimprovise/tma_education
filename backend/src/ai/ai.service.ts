@@ -67,9 +67,9 @@ ${answerText}
   "feedback": "развернутый комментарий на русском языке с конкретными рекомендациями"
 }`;
 
-    this.logger.log(`[AiService.reviewSubmission] Calling OpenAI API with model gpt-5.1-2025-11-13`);
+    this.logger.log(`[AiService.reviewSubmission] Calling OpenAI API with model gpt-4o`);
     const completion = await this.openai.chat.completions.create({
-      model: 'gpt-5.1-2025-11-13',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'system',
