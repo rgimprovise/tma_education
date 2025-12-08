@@ -237,13 +237,31 @@ export class SubmissionsService {
     }
 
     console.log(`[SubmissionsService.reviewWithAI] Calling aiService.reviewSubmission...`);
-    const review = await this.aiService.reviewSubmission(
-      submission.step.content,
-      submission.answerText || '',
-      submission.step.maxScore,
-      submission.step.aiRubric || undefined,
-    );
-    console.log(`[SubmissionsService.reviewWithAI] AI review completed: score=${review.score}`);
+    let review: { score: number; feedback: string } | null = null;
+    try {
+      review = await this.aiService.reviewSubmission(
+        submission.step.content,
+        submission.answerText || '',
+        submission.step.maxScore,
+        submission.step.aiRubric || undefined,
+      );
+      console.log(`[SubmissionsService.reviewWithAI] AI review completed: score=${review.score}`);
+    } catch (aiError: any) {
+      console.error(`[SubmissionsService.reviewWithAI] AI review failed: ${aiError.message}`);
+      // Если ошибка квоты - уведомляем кураторов
+      if (aiError.message && (aiError.message.includes('quota') || aiError.message.includes('429'))) {
+        this.notifyCuratorsAboutAIQuotaError(submissionId).catch((notifyError) => {
+          console.error(`[SubmissionsService.reviewWithAI] Failed to notify curators about quota error:`, notifyError);
+        });
+      }
+      // Продолжаем без ИИ оценки - submission остается в статусе SENT для ручной проверки
+      return;
+    }
+
+    if (!review) {
+      console.error(`[SubmissionsService.reviewWithAI] Review is null, skipping update`);
+      return;
+    }
 
     const updated = await this.prisma.submission.update({
       where: { id: submissionId },

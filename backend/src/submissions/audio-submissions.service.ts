@@ -244,35 +244,62 @@ export class AudioSubmissionsService {
 
       this.logger.log(`Downloaded audio file, size: ${audioBuffer.length} bytes`);
 
-      // 4. Транскрибировать через Whisper
-      const transcription = await this.aiService.transcribeAudio(audioBuffer, filename);
-      this.logger.log(`Transcription: ${transcription.substring(0, 100)}...`);
+      // 4. ВАЖНО: Сохраняем answerFileId СРАЗУ, чтобы файл не потерялся при ошибках транскрипции/ИИ
+      await this.prisma.submission.update({
+        where: { id: submission.id },
+        data: {
+          answerFileId: fileId,
+        },
+      });
+      this.logger.log(`Saved answerFileId: ${fileId}`);
 
-      // 5. Оценить через AI (если требуется)
-      let aiScore: number | null = null;
-      let aiFeedback: string | null = null;
-
-      if (submission.step.requiresAiReview) {
-        const reviewResult = await this.aiService.reviewSubmission(
-          submission.step.content,
-          transcription,
-          submission.step.maxScore,
-          submission.step.aiRubric,
-        );
-        aiScore = reviewResult.score;
-        aiFeedback = reviewResult.feedback;
-        this.logger.log(`AI review completed: score ${aiScore}/${submission.step.maxScore}`);
+      // 5. Транскрибировать через Whisper (с обработкой ошибок)
+      let transcription: string | null = null;
+      try {
+        transcription = await this.aiService.transcribeAudio(audioBuffer, filename);
+        this.logger.log(`Transcription: ${transcription.substring(0, 100)}...`);
+      } catch (transcriptionError: any) {
+        this.logger.error(`[processVoiceSubmission] Transcription failed: ${transcriptionError.message}`);
+        // Продолжаем без транскрипции - файл уже сохранен, куратор сможет прослушать вручную
       }
 
-      // 6. Обновить Submission
+      // 6. Оценить через AI (если требуется и транскрипция успешна)
+      let aiScore: number | null = null;
+      let aiFeedback: string | null = null;
+      let aiReviewStatus: 'SENT' | 'AI_REVIEWED' = 'SENT';
+
+      if (submission.step.requiresAiReview && transcription) {
+        try {
+          const reviewResult = await this.aiService.reviewSubmission(
+            submission.step.content,
+            transcription,
+            submission.step.maxScore,
+            submission.step.aiRubric,
+          );
+          aiScore = reviewResult.score;
+          aiFeedback = reviewResult.feedback;
+          aiReviewStatus = 'AI_REVIEWED';
+          this.logger.log(`AI review completed: score ${aiScore}/${submission.step.maxScore}`);
+        } catch (aiError: any) {
+          this.logger.error(`[processVoiceSubmission] AI review failed: ${aiError.message}`);
+          // Если ошибка квоты - уведомляем кураторов
+          if (aiError.message && (aiError.message.includes('quota') || aiError.message.includes('429'))) {
+            this.notifyCuratorsAboutAIQuotaError(submission.id).catch((notifyError) => {
+              this.logger.error(`[processVoiceSubmission] Failed to notify curators about quota error:`, notifyError);
+            });
+          }
+          // Продолжаем без ИИ оценки - куратор проверит вручную
+        }
+      }
+
+      // 7. Обновить Submission с транскрипцией и ИИ оценкой (если есть)
       const updatedSubmission = await this.prisma.submission.update({
         where: { id: submission.id },
         data: {
           answerText: transcription,
-          answerFileId: fileId,
           aiScore,
           aiFeedback,
-          status: submission.step.requiresAiReview ? 'AI_REVIEWED' : 'SENT',
+          status: aiReviewStatus,
         },
         include: {
           user: {
@@ -337,6 +364,73 @@ export class AudioSubmissionsService {
         this.logger.error(`[processVoiceSubmission] Failed to send error message to user:`, sendError);
       }
     }
+  }
+
+  /**
+   * Уведомить кураторов об ошибке квоты OpenAI API
+   */
+  private async notifyCuratorsAboutAIQuotaError(submissionId: string): Promise<void> {
+    // Загружаем submission с нужными данными
+    const submission = await this.prisma.submission.findUnique({
+      where: { id: submissionId },
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+        step: {
+          select: {
+            index: true,
+            title: true,
+          },
+        },
+        module: {
+          select: {
+            index: true,
+            title: true,
+          },
+        },
+      },
+    });
+
+    if (!submission) {
+      this.logger.error(`[AudioSubmissionsService.notifyCuratorsAboutAIQuotaError] Submission ${submissionId} not found`);
+      return;
+    }
+
+    const curators = await this.prisma.user.findMany({
+      where: {
+        role: {
+          in: ['CURATOR', 'ADMIN'],
+        },
+      },
+      select: {
+        telegramId: true,
+      },
+    });
+
+    const curatorsWithTelegram = curators.filter((c) => c.telegramId !== null);
+
+    const user = submission.user;
+    const step = submission.step;
+    const module = submission.module;
+
+    const message = `⚠️ Ошибка проверки ИИ (аудио)\n\n` +
+      `Не удалось проверить аудио-ответ ученика через ИИ из-за превышения квоты OpenAI API.\n\n` +
+      `Ученик: ${user?.firstName || ''} ${user?.lastName || ''}\n` +
+      `Модуль: ${module?.index || '?'} - ${module?.title || '?'}\n` +
+      `Шаг: ${step?.index || '?'} - ${step?.title || '?'}\n\n` +
+      `Аудио-файл сохранен. Пожалуйста, прослушайте его вручную в интерфейсе куратора.`;
+
+    const notifications = curatorsWithTelegram.map((curator) =>
+      this.telegramService.sendMessage(curator.telegramId!, message).catch((error) => {
+        this.logger.error(`Failed to notify curator ${curator.telegramId} about quota error:`, error);
+      }),
+    );
+
+    await Promise.all(notifications);
   }
 
   /**
