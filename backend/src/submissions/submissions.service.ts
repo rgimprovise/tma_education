@@ -195,7 +195,16 @@ export class SubmissionsService {
       console.log(`[SubmissionsService.create] Starting AI review for submission ${submission.id}`);
       this.reviewWithAI(submission.id).catch((error) => {
         console.error('[SubmissionsService.create] AI review failed:', error);
-        console.error('[SubmissionsService.create] Error stack:', error.stack);
+        console.error('[SubmissionsService.create] Error message:', error.message);
+        if (error.stack) {
+          console.error('[SubmissionsService.create] Error stack:', error.stack);
+        }
+        // Если ошибка квоты - уведомляем кураторов
+        if (error.message && (error.message.includes('quota') || error.message.includes('429'))) {
+          this.notifyCuratorsAboutAIQuotaError(submission.id).catch((notifyError) => {
+            console.error('[SubmissionsService.create] Failed to notify curators about quota error:', notifyError);
+          });
+        }
       });
     } else {
       console.log(`[SubmissionsService.create] AI review skipped - requiresAiReview is false/null`);
@@ -296,6 +305,73 @@ export class SubmissionsService {
         .catch((error) => {
           console.error(`Failed to notify curator ${curator.telegramId}:`, error);
         }),
+    );
+
+    await Promise.all(notifications);
+  }
+
+  /**
+   * Уведомить кураторов об ошибке квоты OpenAI API
+   */
+  private async notifyCuratorsAboutAIQuotaError(submissionId: string): Promise<void> {
+    // Загружаем submission с нужными данными
+    const submission = await this.prisma.submission.findUnique({
+      where: { id: submissionId },
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+        step: {
+          select: {
+            index: true,
+            title: true,
+          },
+        },
+        module: {
+          select: {
+            index: true,
+            title: true,
+          },
+        },
+      },
+    });
+
+    if (!submission) {
+      console.error(`[SubmissionsService.notifyCuratorsAboutAIQuotaError] Submission ${submissionId} not found`);
+      return;
+    }
+
+    const curators = await this.prisma.user.findMany({
+      where: {
+        role: {
+          in: ['CURATOR', 'ADMIN'],
+        },
+      },
+      select: {
+        telegramId: true,
+      },
+    });
+
+    const curatorsWithTelegram = curators.filter((c) => c.telegramId !== null);
+
+    const user = submission.user;
+    const step = submission.step;
+    const module = submission.module;
+
+    const message = `⚠️ Ошибка проверки ИИ\n\n` +
+      `Не удалось проверить ответ ученика через ИИ из-за превышения квоты OpenAI API.\n\n` +
+      `Ученик: ${user?.firstName || ''} ${user?.lastName || ''}\n` +
+      `Модуль: ${module?.index || '?'} - ${module?.title || '?'}\n` +
+      `Шаг: ${step?.index || '?'} - ${step?.title || '?'}\n\n` +
+      `Пожалуйста, проверьте ответ вручную в интерфейсе куратора.`;
+
+    const notifications = curatorsWithTelegram.map((curator) =>
+      this.telegramService.sendMessage(curator.telegramId!, message).catch((error) => {
+        console.error(`Failed to notify curator ${curator.telegramId} about quota error:`, error);
+      }),
     );
 
     await Promise.all(notifications);
