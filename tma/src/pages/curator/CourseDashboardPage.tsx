@@ -23,6 +23,24 @@ interface CourseModule {
   autoUnlockForNewLearners?: boolean;
 }
 
+interface LearnerEnrollment {
+  module: {
+    id: string;
+    index: number;
+    title: string;
+  };
+  status: 'LOCKED' | 'IN_PROGRESS' | 'COMPLETED';
+}
+
+interface LearnerItem {
+  id: string;
+  telegramId?: string;
+  firstName?: string;
+  lastName?: string;
+  position?: string;
+  enrollments: LearnerEnrollment[];
+}
+
 export function CourseDashboardPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
@@ -34,6 +52,14 @@ export function CourseDashboardPage() {
   const [lockingModuleId, setLockingModuleId] = useState<string | null>(null);
   const [settingAutoUnlock, setSettingAutoUnlock] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [learners, setLearners] = useState<LearnerItem[]>([]);
+  const [learnersLoaded, setLearnersLoaded] = useState(false);
+  const [learnersLoading, setLearnersLoading] = useState(false);
+  const [learnersError, setLearnersError] = useState<string | null>(null);
+  const [unlockForLearnerModuleId, setUnlockForLearnerModuleId] = useState<string | null>(null);
+  const [selectedLearnerId, setSelectedLearnerId] = useState<string | null>(null);
+  const [searchLearner, setSearchLearner] = useState('');
+  const [unlockingForLearner, setUnlockingForLearner] = useState(false);
 
   useEffect(() => {
     if (courseId) {
@@ -192,6 +218,88 @@ export function CourseDashboardPage() {
       }
     } finally {
       setSettingAutoUnlock(null);
+    }
+  };
+
+  const loadLearnersList = async () => {
+    if (learnersLoaded || learnersLoading) return;
+    try {
+      setLearnersLoading(true);
+      setLearnersError(null);
+      const response = await api.get('/admin/learners');
+      setLearners(response.data || []);
+      setLearnersLoaded(true);
+    } catch (err: any) {
+      console.error('Failed to load learners list:', err);
+      setLearnersError(err.response?.data?.message || 'Не удалось загрузить список учеников');
+    } finally {
+      setLearnersLoading(false);
+    }
+  };
+
+  const handleOpenForLearner = async (moduleId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setUnlockForLearnerModuleId(moduleId);
+    setSelectedLearnerId(null);
+    setSearchLearner('');
+    await loadLearnersList();
+  };
+
+  const getEnrollmentStatus = (learner: LearnerItem, moduleId: string) => {
+    const enrollment = learner.enrollments.find((enr) => enr.module.id === moduleId);
+    return enrollment?.status || 'LOCKED';
+  };
+
+  const filteredLearners = learners.filter((learner) => {
+    if (!searchLearner.trim()) return true;
+    const query = searchLearner.trim().toLowerCase();
+    const fullName = `${learner.firstName || ''} ${learner.lastName || ''}`.toLowerCase();
+    const telegramId = learner.telegramId ? String(learner.telegramId) : '';
+    const position = learner.position?.toLowerCase() || '';
+    return (
+      fullName.includes(query) ||
+      telegramId.includes(query) ||
+      position.includes(query)
+    );
+  });
+
+  const handleUnlockForSelectedLearner = async () => {
+    if (!unlockForLearnerModuleId || !selectedLearnerId) {
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert('Выберите ученика');
+      } else {
+        alert('Выберите ученика');
+      }
+      return;
+    }
+
+    try {
+      setUnlockingForLearner(true);
+      const response = await api.post(`/admin/modules/${unlockForLearnerModuleId}/unlock`, {
+        userIds: [selectedLearnerId],
+      });
+
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(
+          response.data.message || 'Модуль открыт для выбранного ученика'
+        );
+      } else {
+        alert(response.data.message || 'Модуль открыт для выбранного ученика');
+      }
+
+      setUnlockForLearnerModuleId(null);
+      setSelectedLearnerId(null);
+      await loadCourseData();
+    } catch (err: any) {
+      console.error('Failed to unlock module for learner:', err);
+      const errorMessage = err.response?.data?.message || 'Ошибка при открытии для ученика';
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`❌ ${errorMessage}`);
+      } else {
+        alert(`❌ ${errorMessage}`);
+      }
+    } finally {
+      setUnlockingForLearner(false);
     }
   };
 
@@ -564,6 +672,13 @@ export function CourseDashboardPage() {
                     >
                       ✏️ Редактировать
                     </button>
+                    <button
+                      className="btn-unlock-learner"
+                      onClick={(e) => handleOpenForLearner(module.id, e)}
+                      disabled={learnersLoading && unlockForLearnerModuleId === module.id}
+                    >
+                      🎯 Открыть ученику
+                    </button>
                   </div>
                   <button
                     className={`btn-auto-unlock ${module.autoUnlockForNewLearners ? 'active' : ''}`}
@@ -600,6 +715,95 @@ export function CourseDashboardPage() {
           </div>
         </div>
       </div>
+
+      {unlockForLearnerModuleId && (
+        <div className="modal-backdrop" onClick={() => setUnlockForLearnerModuleId(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Открыть модуль ученику</h3>
+              <button
+                className="modal-close"
+                onClick={() => setUnlockForLearnerModuleId(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="modal-hint">
+                Выберите тестового ученика, чтобы открыть доступ к модулю без открытия для всех.
+              </div>
+
+              <input
+                type="text"
+                className="modal-search"
+                placeholder="Поиск по имени, должности или Telegram ID"
+                value={searchLearner}
+                onChange={(e) => setSearchLearner(e.target.value)}
+              />
+
+              {learnersError && (
+                <div className="modal-error">{learnersError}</div>
+              )}
+
+              {learnersLoading ? (
+                <div className="modal-loading">Загрузка списка учеников...</div>
+              ) : (
+                <div className="learner-list">
+                  {filteredLearners.length === 0 ? (
+                    <div className="empty-state small">Не найдено учеников</div>
+                  ) : (
+                    filteredLearners.map((learner) => {
+                      const status = getEnrollmentStatus(learner, unlockForLearnerModuleId);
+                      const name = `${learner.firstName || ''} ${learner.lastName || ''}`.trim() || 'Без имени';
+                      return (
+                        <label
+                          key={learner.id}
+                          className={`learner-item ${selectedLearnerId === learner.id ? 'selected' : ''}`}
+                        >
+                          <input
+                            type="radio"
+                            name="selectedLearner"
+                            value={learner.id}
+                            checked={selectedLearnerId === learner.id}
+                            onChange={() => setSelectedLearnerId(learner.id)}
+                          />
+                          <div className="learner-info">
+                            <div className="learner-name">{name}</div>
+                            <div className="learner-meta">
+                              {learner.position && <span className="tag">{learner.position}</span>}
+                              {learner.telegramId && <span className="tag">TG: {learner.telegramId}</span>}
+                              <span className={`tag status-${status.toLowerCase()}`}>
+                                {status === 'LOCKED' ? '🔒 Закрыт' : status === 'COMPLETED' ? '✅ Завершён' : '📚 В процессе'}
+                              </span>
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setUnlockForLearnerModuleId(null)}
+              >
+                Отмена
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleUnlockForSelectedLearner}
+                disabled={unlockingForLearner || learnersLoading}
+              >
+                {unlockingForLearner ? 'Открываю...' : 'Открыть ученику'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
