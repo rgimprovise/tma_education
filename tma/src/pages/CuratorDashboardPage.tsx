@@ -242,10 +242,10 @@ export function CuratorDashboardPage() {
           Участники ({displayedLearners.length} из {learners.length}):
         </h2>
         {displayedLearners.length === 0 ? (
-          <div className="empty-state">
+            <div className="empty-state">
             <p>Нет участников по выбранным фильтрам</p>
-          </div>
-        ) : (
+            </div>
+          ) : (
           displayedLearners.map((learner) => {
               const userName = `${learner.firstName || ''} ${learner.lastName || ''}`.trim() || 'Без имени';
               const completedModules = learner.enrollments.filter((e) => e.status === 'COMPLETED').length;
@@ -265,7 +265,7 @@ export function CuratorDashboardPage() {
                       )}
                     </div>
                     <div className="learner-badges">
-                      {learner.pendingSubmissions > 0 && (
+                    {learner.pendingSubmissions > 0 && (
                         <div className="pending-badge" title="Сдачи на проверке">
                           ⏳ {learner.pendingSubmissions}
                         </div>
@@ -278,8 +278,8 @@ export function CuratorDashboardPage() {
                       {learner.resubmissionRequestedSubmissions > 0 && (
                         <div className="resubmission-badge" title="Запрос на повторную отправку">
                           ❓ {learner.resubmissionRequestedSubmissions}
-                        </div>
-                      )}
+                      </div>
+                    )}
                     </div>
                   </div>
 

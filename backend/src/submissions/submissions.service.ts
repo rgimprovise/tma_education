@@ -150,43 +150,43 @@ export class SubmissionsService {
     } else {
       // Создаём новую submission
       submission = await this.prisma.submission.create({
-        data: {
-          userId: data.userId,
-          stepId: data.stepId,
-          moduleId: data.moduleId,
-          answerText: data.answerText,
-          answerFileId: data.answerFileId,
-          answerType: data.answerType,
-          status: 'SENT',
-        },
-        include: {
-          step: {
-            select: {
-              id: true,
-              title: true,
-              index: true,
-              type: true,
-              requiresAiReview: true,
-              content: true,
-              maxScore: true,
-            },
-          },
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-          module: {
-            select: {
-              id: true,
-              index: true,
-              title: true,
-            },
+      data: {
+        userId: data.userId,
+        stepId: data.stepId,
+        moduleId: data.moduleId,
+        answerText: data.answerText,
+        answerFileId: data.answerFileId,
+        answerType: data.answerType,
+        status: 'SENT',
+      },
+      include: {
+        step: {
+          select: {
+            id: true,
+            title: true,
+            index: true,
+            type: true,
+            requiresAiReview: true,
+            content: true,
+            maxScore: true,
           },
         },
-      });
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        module: {
+          select: {
+            id: true,
+            index: true,
+            title: true,
+          },
+        },
+      },
+    });
     }
 
     // 9. Если требуется проверка ИИ, запускаем асинхронно

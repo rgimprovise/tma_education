@@ -67,7 +67,7 @@ ${answerText}
 }`;
 
     const completion = await this.openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-5.1-2025-11-13',
       messages: [
         {
           role: 'system',
