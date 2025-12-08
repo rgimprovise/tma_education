@@ -92,10 +92,26 @@ ${answerText}
     }
 
     try {
-      const parsed = JSON.parse(content);
+      // Убираем markdown code blocks если есть
+      let cleanedContent = content.trim();
+      if (cleanedContent.startsWith('```json')) {
+        cleanedContent = cleanedContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanedContent.startsWith('```')) {
+        cleanedContent = cleanedContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+      
+      const parsed = JSON.parse(cleanedContent);
+      
+      // Извлекаем только текст feedback, убеждаемся что это строка
+      let feedbackText = parsed.feedback;
+      if (typeof feedbackText !== 'string') {
+        // Если feedback это объект, пытаемся извлечь текст
+        feedbackText = JSON.stringify(feedbackText);
+      }
+      
       return {
         score: Math.min(Math.max(parsed.score || 0, 0), maxScore),
-        feedback: parsed.feedback || content,
+        feedback: feedbackText || content,
       };
     } catch (e) {
       // Если не JSON, пытаемся извлечь оценку из текста

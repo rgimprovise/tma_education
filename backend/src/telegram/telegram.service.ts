@@ -618,6 +618,25 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       ? `${submission.aiScore}/10` 
       : 'не оценено';
 
+    // Очищаем aiFeedback от JSON-форматирования, если оно там есть
+    let aiFeedbackText = submission.aiFeedback || '';
+    if (aiFeedbackText) {
+      try {
+        // Если это JSON строка, пытаемся распарсить и извлечь только feedback
+        const parsed = JSON.parse(aiFeedbackText);
+        if (parsed.feedback && typeof parsed.feedback === 'string') {
+          aiFeedbackText = parsed.feedback;
+        } else if (typeof parsed === 'string') {
+          aiFeedbackText = parsed;
+        }
+      } catch (e) {
+        // Если не JSON, оставляем как есть
+      }
+      // Убираем markdown code blocks если есть
+      aiFeedbackText = aiFeedbackText.replace(/^```json\s*/g, '').replace(/\s*```$/g, '');
+      aiFeedbackText = aiFeedbackText.replace(/^```\s*/g, '').replace(/\s*```$/g, '');
+    }
+
     const message = `📬 Новая сдача задания
 
 👤 Участник: ${userName}
@@ -626,7 +645,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
 
 🤖 Предварительная оценка ИИ: ${aiScore}
 
-${submission.aiFeedback ? `💬 Комментарий ИИ:\n${submission.aiFeedback}\n` : ''}
+${aiFeedbackText ? `💬 Комментарий ИИ:\n${aiFeedbackText}\n` : ''}
 ---`;
 
     await this.sendMessage(curatorTelegramId, message, {
