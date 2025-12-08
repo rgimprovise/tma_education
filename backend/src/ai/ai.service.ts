@@ -24,6 +24,7 @@ export class AiService {
     maxScore: number = 10,
     aiRubric?: string,
   ): Promise<ReviewResult> {
+    this.logger.log(`[AiService.reviewSubmission] Starting review, maxScore=${maxScore}, aiRubric=${aiRubric ? 'present' : 'missing'}`);
     // Если есть специфичные критерии для шага, используем их
     // Иначе используем общий промпт по принципу Минто
     const criteriaSection = aiRubric
@@ -66,8 +67,9 @@ ${answerText}
   "feedback": "развернутый комментарий на русском языке с конкретными рекомендациями"
 }`;
 
+    this.logger.log(`[AiService.reviewSubmission] Calling OpenAI API with model gpt-4o`);
     const completion = await this.openai.chat.completions.create({
-      model: 'gpt-5.1-2025-11-13',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'system',
@@ -82,6 +84,7 @@ ${answerText}
       temperature: 0.7,
       max_tokens: 1000,
     });
+    this.logger.log(`[AiService.reviewSubmission] OpenAI API response received`);
 
     const content = completion.choices[0].message.content;
     if (!content) {

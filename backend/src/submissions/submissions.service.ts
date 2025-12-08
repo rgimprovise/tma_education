@@ -190,16 +190,22 @@ export class SubmissionsService {
     }
 
     // 9. Если требуется проверка ИИ, запускаем асинхронно
+    console.log(`[SubmissionsService.create] Step ${submission.step.id} requiresAiReview: ${submission.step.requiresAiReview}`);
     if (submission.step.requiresAiReview) {
+      console.log(`[SubmissionsService.create] Starting AI review for submission ${submission.id}`);
       this.reviewWithAI(submission.id).catch((error) => {
-        console.error('AI review failed:', error);
+        console.error('[SubmissionsService.create] AI review failed:', error);
+        console.error('[SubmissionsService.create] Error stack:', error.stack);
       });
+    } else {
+      console.log(`[SubmissionsService.create] AI review skipped - requiresAiReview is false/null`);
     }
 
     return submission;
   }
 
   async reviewWithAI(submissionId: string) {
+    console.log(`[SubmissionsService.reviewWithAI] Starting review for submission ${submissionId}`);
     const submission = await this.prisma.submission.findUnique({
       where: { id: submissionId },
       include: {
@@ -208,16 +214,27 @@ export class SubmissionsService {
       },
     });
 
-    if (!submission || !submission.step.requiresAiReview) {
+    if (!submission) {
+      console.error(`[SubmissionsService.reviewWithAI] Submission ${submissionId} not found`);
       return;
     }
 
+    console.log(`[SubmissionsService.reviewWithAI] Submission found, step requiresAiReview: ${submission.step.requiresAiReview}`);
+    console.log(`[SubmissionsService.reviewWithAI] Step ID: ${submission.step.id}, aiRubric: ${submission.step.aiRubric ? 'present' : 'missing'}`);
+
+    if (!submission.step.requiresAiReview) {
+      console.log(`[SubmissionsService.reviewWithAI] Skipping - requiresAiReview is false/null`);
+      return;
+    }
+
+    console.log(`[SubmissionsService.reviewWithAI] Calling aiService.reviewSubmission...`);
     const review = await this.aiService.reviewSubmission(
       submission.step.content,
       submission.answerText || '',
       submission.step.maxScore,
       submission.step.aiRubric || undefined,
     );
+    console.log(`[SubmissionsService.reviewWithAI] AI review completed: score=${review.score}`);
 
     const updated = await this.prisma.submission.update({
       where: { id: submissionId },
