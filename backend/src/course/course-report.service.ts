@@ -35,6 +35,8 @@ export class CourseReportService {
                 user: {
                   select: {
                     id: true,
+                    firstName: true,
+                    lastName: true,
                     position: true,
                     role: true,
                   },
@@ -46,6 +48,8 @@ export class CourseReportService {
                 user: {
                   select: {
                     id: true,
+                    firstName: true,
+                    lastName: true,
                     position: true,
                     role: true,
                   },
@@ -174,8 +178,8 @@ export class CourseReportService {
           const user = usersMap.get(userId);
           learnersMap.set(userId, {
             userId,
-            firstName: enrollment.user?.firstName || '',
-            lastName: enrollment.user?.lastName || '',
+            firstName: user?.firstName || enrollment.user?.firstName || '',
+            lastName: user?.lastName || enrollment.user?.lastName || '',
             position: user?.position || null,
             modulesCompleted: 0,
             modulesInProgress: 0,
@@ -210,8 +214,8 @@ export class CourseReportService {
           const user = usersMap.get(userId);
           learnersMap.set(userId, {
             userId,
-            firstName: submission.user?.firstName || '',
-            lastName: submission.user?.lastName || '',
+            firstName: user?.firstName || submission.user?.firstName || '',
+            lastName: user?.lastName || submission.user?.lastName || '',
             position: user?.position || null,
             modulesCompleted: 0,
             modulesInProgress: 0,

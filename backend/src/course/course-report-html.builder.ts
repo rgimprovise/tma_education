@@ -364,7 +364,7 @@ function buildProblems(report: CourseReportData): string {
 
   const learnerProblems = problemLearners.length > 0
     ? problemLearners.map(learner => {
-        const fullName = `${learner.firstName} ${learner.lastName}`.trim();
+        const fullName = `${learner.firstName} ${learner.lastName}`.trim() || 'Не указано';
         const issues: string[] = [];
         
         if (learner.returnedSubmissions > 0) {
@@ -393,7 +393,7 @@ function buildProblems(report: CourseReportData): string {
         
         return `
           <li>
-            <strong>${escapeHtml(fullName)}</strong><br>
+            <strong style="font-size: 16px; color: #721c24;">👤 ${escapeHtml(fullName)}</strong><br>
             ${issues.join('; ')}
           </li>
         `;
@@ -492,7 +492,7 @@ function buildLearnersProgress(report: CourseReportData): string {
   }
 
   const rows = report.learnersProgress.map(learner => {
-    const fullName = `${learner.firstName} ${learner.lastName}`.trim();
+    const fullName = `${learner.firstName || ''} ${learner.lastName || ''}`.trim() || 'Не указано';
     const position = learner.position || '—';
     const avgScore = learner.avgScore !== null ? learner.avgScore.toFixed(1) : '—';
     const scoreBadge = learner.avgScore !== null && learner.avgScore < 6
@@ -506,7 +506,7 @@ function buildLearnersProgress(report: CourseReportData): string {
 
     return `
       <tr>
-        <td>${escapeHtml(fullName)}</td>
+        <td><strong>${escapeHtml(fullName)}</strong></td>
         <td>${escapeHtml(position)}</td>
         <td class="text-center">${learner.modulesCompleted}</td>
         <td class="text-center">${learner.modulesInProgress}</td>
