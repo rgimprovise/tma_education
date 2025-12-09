@@ -4,7 +4,7 @@
  * Скрипт для отправки аудиофайлов от учеников куратору
  * 
  * Использование:
- *   node scripts/send-audio-to-curator.js [curatorTelegramId] [--all|--no-transcription]
+ *   node scripts/send-audio-to-curator.js [curatorTelegramId] [--all|--no-transcription|--users "name1,name2"]
  * 
  * Примеры:
  *   # Отправить все аудио без транскрипции конкретному куратору
@@ -15,6 +15,9 @@
  * 
  *   # Отправить аудио конкретного ученика (по submissionId)
  *   node scripts/send-audio-to-curator.js 123456789 --submission-id cmix6547y00019uw2wtzw94yx
+ * 
+ *   # Отправить аудио от конкретных учеников (по именам)
+ *   node scripts/send-audio-to-curator.js 123456789 --users "Анна Фомина,Екатерина Кузьмина"
  */
 
 const { PrismaClient } = require('@prisma/client');
@@ -26,7 +29,7 @@ const prisma = new PrismaClient();
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURATOR_TELEGRAM_ID = process.argv[2];
 const FLAG = process.argv[3];
-const SUBMISSION_ID = process.argv[4];
+const FLAG_VALUE = process.argv[4];
 
 if (!BOT_TOKEN) {
   console.error('❌ Ошибка: TELEGRAM_BOT_TOKEN не установлен в переменных окружения');
@@ -92,10 +95,89 @@ async function findAndSendAudio() {
   try {
     let submissions = [];
 
-    if (FLAG === '--submission-id' && SUBMISSION_ID) {
+    if (FLAG === '--users' && FLAG_VALUE) {
+      // Найти аудио от конкретных учеников по именам
+      const userNames = FLAG_VALUE.split(',').map(name => name.trim());
+      console.log(`🔍 Поиск учеников: ${userNames.join(', ')}`);
+      
+      // Найти пользователей по именам (ищем по firstName и lastName)
+      const users = await prisma.user.findMany({
+        where: {
+          role: 'LEARNER',
+          OR: userNames.map(name => {
+            const parts = name.split(' ').filter(p => p.length > 0);
+            if (parts.length === 1) {
+              // Только имя или фамилия
+              return {
+                OR: [
+                  { firstName: { contains: parts[0], mode: 'insensitive' } },
+                  { lastName: { contains: parts[0], mode: 'insensitive' } },
+                ],
+              };
+            } else {
+              // Имя и фамилия
+              return {
+                AND: [
+                  { firstName: { contains: parts[0], mode: 'insensitive' } },
+                  { lastName: { contains: parts[parts.length - 1], mode: 'insensitive' } },
+                ],
+              };
+            }
+          }),
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+        },
+      });
+
+      if (users.length === 0) {
+        console.error('❌ Ученики не найдены');
+        process.exit(1);
+      }
+
+      console.log(`✅ Найдено учеников: ${users.length}`);
+      users.forEach(u => {
+        console.log(`   - ${u.firstName} ${u.lastName} (ID: ${u.id})`);
+      });
+
+      const userIds = users.map(u => u.id);
+
+      submissions = await prisma.submission.findMany({
+        where: {
+          answerFileId: { not: null },
+          answerType: { in: ['AUDIO', 'VIDEO'] },
+          userId: { in: userIds },
+        },
+        include: {
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
+          step: {
+            select: {
+              title: true,
+              index: true,
+            },
+          },
+          module: {
+            select: {
+              title: true,
+              index: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+    } else if (FLAG === '--submission-id' && FLAG_VALUE) {
       // Отправить конкретный submission
       const submission = await prisma.submission.findUnique({
-        where: { id: SUBMISSION_ID },
+        where: { id: FLAG_VALUE },
         include: {
           user: {
             select: {
@@ -196,7 +278,7 @@ async function findAndSendAudio() {
         },
       });
     } else {
-      console.error('❌ Ошибка: Укажите флаг --all, --no-transcription или --submission-id <id>');
+      console.error('❌ Ошибка: Укажите флаг --all, --no-transcription, --submission-id <id> или --users "name1,name2"');
       process.exit(1);
     }
 

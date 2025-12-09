@@ -36,6 +36,16 @@ source .env
 node scripts/send-audio-to-curator.js YOUR_TELEGRAM_ID --submission-id cmix6547y00019uw2wtzw94yx
 ```
 
+### 4. Отправить аудио от конкретных учеников
+
+Отправить аудиофайлы только от указанных учеников (по именам):
+
+```bash
+cd /var/www/tma_education/backend
+source .env
+node scripts/send-audio-to-curator.js YOUR_TELEGRAM_ID --users "Анна Фомина,Екатерина Кузьмина,Елена Корниенко"
+```
+
 ## Как узнать свой Telegram ID
 
 1. Напишите боту [@userinfobot](https://t.me/userinfobot) в Telegram
