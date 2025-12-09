@@ -11,7 +11,7 @@ import {
   SlaStats,
   ProblemReport,
 } from './dto/course-report.dto';
-import { ModuleStatus, SubmissionStatus, UserRole } from '@prisma/client';
+import { ModuleStatus, SubmissionStatus, UserRole, StepType } from '@prisma/client';
 
 @Injectable()
 export class CourseReportService {
@@ -93,14 +93,23 @@ export class CourseReportService {
 
     const usersMap = new Map(users.map((u) => [u.id, u]));
 
+    // Фильтруем модули: исключаем те, у которых нет enrollments
+    const modulesWithEnrollments = course.modules.filter((module: any) => {
+      const enrollments = module.enrollments.filter((e: any) => usersMap.has(e.userId));
+      return enrollments.length > 0;
+    });
+
     // Строим отчёт
-    const courseInfo = this.buildCourseInfo(course);
-    const stats = this.buildCourseStats(course, usersMap);
-    const modules = this.buildModulesReport(course.modules, usersMap);
-    const positions = this.buildPositionsReport(course.modules, usersMap);
-    const aiVsCurator = this.buildAiVsCuratorStats(course.modules);
-    const sla = this.buildSlaStats(course.modules);
+    const courseInfo = this.buildCourseInfo(course, modulesWithEnrollments);
+    const stats = this.buildCourseStats(modulesWithEnrollments, usersMap);
+    const modules = this.buildModulesReport(modulesWithEnrollments, usersMap);
+    const positions = this.buildPositionsReport(modulesWithEnrollments, usersMap);
+    const aiVsCurator = this.buildAiVsCuratorStats(modulesWithEnrollments);
+    const sla = this.buildSlaStats(modulesWithEnrollments);
     const problems = this.buildProblemsReport(modules);
+    
+    // Строим список всех учеников с прогрессом
+    const learnersProgress = this.buildLearnersProgress(modulesWithEnrollments, usersMap);
 
     return {
       course: courseInfo,
@@ -110,14 +119,16 @@ export class CourseReportService {
       aiVsCurator,
       sla,
       problems,
+      learnersProgress,
     };
   }
 
   /**
    * Построить информацию о курсе
    */
-  private buildCourseInfo(course: any): CourseReportInfo {
-    const allSteps = course.modules.flatMap((m: any) => m.steps);
+  private buildCourseInfo(course: any, modules: any[]): CourseReportInfo {
+    // Исключаем шаги типа INFO
+    const allSteps = modules.flatMap((m: any) => m.steps).filter((s: any) => s.type !== StepType.INFO);
     const requiredSteps = allSteps.filter((s: any) => s.isRequired);
     
     // Находим период обучения: от первого unlockedAt до последнего completedAt
@@ -148,11 +159,146 @@ export class CourseReportService {
   }
 
   /**
+   * Построить список всех учеников с прогрессом
+   */
+  private buildLearnersProgress(modules: any[], usersMap: Map<string, any>): any[] {
+    const learnersMap = new Map<string, any>();
+
+    // Собираем данные по каждому ученику
+    modules.forEach((module: any) => {
+      module.enrollments.forEach((enrollment: any) => {
+        const userId = enrollment.userId;
+        if (!usersMap.has(userId)) return;
+
+        if (!learnersMap.has(userId)) {
+          const user = usersMap.get(userId);
+          learnersMap.set(userId, {
+            userId,
+            firstName: enrollment.user?.firstName || '',
+            lastName: enrollment.user?.lastName || '',
+            position: user?.position || null,
+            modulesCompleted: 0,
+            modulesInProgress: 0,
+            totalSubmissions: 0,
+            approvedSubmissions: 0,
+            returnedSubmissions: 0,
+            avgScore: null,
+            lowScores: [] as any[],
+            returnedSteps: [] as any[],
+          });
+        }
+
+        const learner = learnersMap.get(userId);
+        if (enrollment.status === ModuleStatus.COMPLETED) {
+          learner.modulesCompleted++;
+        } else if (enrollment.status === ModuleStatus.IN_PROGRESS) {
+          learner.modulesInProgress++;
+        }
+      });
+
+      // Собираем submissions (исключаем шаги типа INFO)
+      const nonInfoStepIds = new Set(
+        module.steps.filter((s: any) => s.type !== StepType.INFO).map((s: any) => s.id)
+      );
+
+      module.submissions.forEach((submission: any) => {
+        if (!usersMap.has(submission.userId)) return;
+        if (!nonInfoStepIds.has(submission.stepId)) return; // Исключаем INFO шаги
+
+        const userId = submission.userId;
+        if (!learnersMap.has(userId)) {
+          const user = usersMap.get(userId);
+          learnersMap.set(userId, {
+            userId,
+            firstName: submission.user?.firstName || '',
+            lastName: submission.user?.lastName || '',
+            position: user?.position || null,
+            modulesCompleted: 0,
+            modulesInProgress: 0,
+            totalSubmissions: 0,
+            approvedSubmissions: 0,
+            returnedSubmissions: 0,
+            avgScore: null,
+            lowScores: [] as any[],
+            returnedSteps: [] as any[],
+          });
+        }
+
+        const learner = learnersMap.get(userId);
+        learner.totalSubmissions++;
+
+        if (submission.status === SubmissionStatus.CURATOR_APPROVED) {
+          learner.approvedSubmissions++;
+        } else if (submission.status === SubmissionStatus.CURATOR_RETURNED) {
+          learner.returnedSubmissions++;
+          learner.returnedSteps.push({
+            moduleIndex: module.index,
+            moduleTitle: module.title,
+            stepIndex: submission.step?.index || '?',
+            stepTitle: submission.step?.title || '?',
+          });
+        }
+
+        // Проверяем низкие оценки (менее 6/10)
+        const score = submission.curatorScore || submission.aiScore;
+        if (score !== null && score !== undefined && score < 6) {
+          learner.lowScores.push({
+            moduleIndex: module.index,
+            moduleTitle: module.title,
+            stepIndex: submission.step?.index || '?',
+            stepTitle: submission.step?.title || '?',
+            score: score,
+          });
+        }
+      });
+    });
+
+    // Вычисляем средний балл для каждого ученика
+    const learners = Array.from(learnersMap.values()).map((learner) => {
+      const allScores: number[] = [];
+      modules.forEach((module: any) => {
+        const nonInfoStepIds = new Set(
+          module.steps.filter((s: any) => s.type !== StepType.INFO).map((s: any) => s.id)
+        );
+        module.submissions
+          .filter((s: any) => s.userId === learner.userId && nonInfoStepIds.has(s.stepId))
+          .forEach((s: any) => {
+            const score = s.curatorScore || s.aiScore;
+            if (score !== null && score !== undefined) {
+              allScores.push(score);
+            }
+          });
+      });
+
+      learner.avgScore = allScores.length > 0
+        ? allScores.reduce((a, b) => a + b, 0) / allScores.length
+        : null;
+
+      return learner;
+    });
+
+    // Сортируем по имени
+    learners.sort((a, b) => {
+      const nameA = `${a.firstName} ${a.lastName}`.toLowerCase();
+      const nameB = `${b.firstName} ${b.lastName}`.toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    return learners;
+  }
+
+  /**
    * Построить общие KPI по курсу
    */
-  private buildCourseStats(course: any, usersMap: Map<string, any>): CourseStats {
-    const allEnrollments = course.modules.flatMap((m: any) => m.enrollments);
-    const allSubmissions = course.modules.flatMap((m: any) => m.submissions);
+  private buildCourseStats(modules: any[], usersMap: Map<string, any>): CourseStats {
+    const allEnrollments = modules.flatMap((m: any) => m.enrollments);
+    // Исключаем submissions для шагов типа INFO
+    const allSubmissions = modules.flatMap((module: any) => {
+      const nonInfoStepIds = new Set(
+        module.steps.filter((s: any) => s.type !== StepType.INFO).map((s: any) => s.id)
+      );
+      return module.submissions.filter((s: any) => nonInfoStepIds.has(s.stepId));
+    });
     
     // Уникальные участники (только LEARNER)
     const uniqueLearnerIds = new Set<string>();
@@ -174,7 +320,7 @@ export class CourseReportService {
 
     // Завершили курс (COMPLETED для всех модулей)
     const completedByModule = new Map<string, Set<string>>();
-    course.modules.forEach((module: any) => {
+    modules.forEach((module: any) => {
       const completed = module.enrollments
         .filter((e: any) => e.status === ModuleStatus.COMPLETED)
         .map((e: any) => e.userId);
@@ -182,7 +328,7 @@ export class CourseReportService {
     });
 
     const completedLearners = Array.from(uniqueLearnerIds).filter((userId) => {
-      return course.modules.every((module: any) => {
+      return modules.every((module: any) => {
         const completed = completedByModule.get(module.id);
         return completed && completed.has(userId);
       });
@@ -303,9 +449,12 @@ export class CourseReportService {
             }
           : null;
 
-      // Детализация по шагам
+      // Исключаем шаги типа INFO при подсчете
+      const nonInfoSteps = module.steps.filter((s: any) => s.type !== StepType.INFO);
+      
+      // Детализация по шагам (исключаем INFO)
       const steps = this.buildStepsReport(module.steps, module.submissions, enrollments.length);
-
+      
       return {
         module: {
           id: module.id,
@@ -313,8 +462,8 @@ export class CourseReportService {
           title: module.title,
           description: module.description,
           isExam: module.isExam,
-          stepsCount: module.steps.length,
-          requiredStepsCount: module.steps.filter((s: any) => s.isRequired).length,
+          stepsCount: nonInfoSteps.length,
+          requiredStepsCount: nonInfoSteps.filter((s: any) => s.isRequired).length,
         },
         enrollmentStats,
         submissionStats,
@@ -329,7 +478,8 @@ export class CourseReportService {
    * Построить отчёт по шагам
    */
   private buildStepsReport(steps: any[], allSubmissions: any[], totalLearners: number): StepReportData[] {
-    return steps.map((step) => {
+    // Исключаем шаги типа INFO
+    return steps.filter((step: any) => step.type !== StepType.INFO).map((step) => {
       const stepSubmissions = allSubmissions.filter((s: any) => s.stepId === step.id);
       
       const submissionStats = {
@@ -384,6 +534,11 @@ export class CourseReportService {
 
     // Собираем данные по должностям
     modules.forEach((module) => {
+      // Исключаем submissions для шагов типа INFO
+      const nonInfoStepIds = new Set(
+        module.steps.filter((s: any) => s.type !== StepType.INFO).map((s: any) => s.id)
+      );
+
       module.enrollments.forEach((enrollment: any) => {
         const user = usersMap.get(enrollment.userId);
         if (!user) return;
@@ -403,23 +558,25 @@ export class CourseReportService {
         posData.enrollments.push(enrollment);
       });
 
-      module.submissions.forEach((submission: any) => {
-        const user = usersMap.get(submission.userId);
-        if (!user) return;
+      module.submissions
+        .filter((s: any) => nonInfoStepIds.has(s.stepId))
+        .forEach((submission: any) => {
+          const user = usersMap.get(submission.userId);
+          if (!user) return;
 
-        const position = user.position || null;
-        if (!positionsMap.has(position)) {
-          positionsMap.set(position, {
-            position,
-            learnerIds: new Set<string>(),
-            enrollments: [],
-            submissions: [],
-          });
-        }
+          const position = user.position || null;
+          if (!positionsMap.has(position)) {
+            positionsMap.set(position, {
+              position,
+              learnerIds: new Set<string>(),
+              enrollments: [],
+              submissions: [],
+            });
+          }
 
-        const posData = positionsMap.get(position);
-        posData.submissions.push(submission);
-      });
+          const posData = positionsMap.get(position);
+          posData.submissions.push(submission);
+        });
     });
 
     // Формируем отчёт
@@ -473,7 +630,13 @@ export class CourseReportService {
    * Построить статистику AI vs Curator
    */
   private buildAiVsCuratorStats(modules: any[]): AiVsCuratorStats {
-    const allSubmissions = modules.flatMap((m: any) => m.submissions);
+    // Исключаем submissions для шагов типа INFO
+    const allSubmissions = modules.flatMap((module: any) => {
+      const nonInfoStepIds = new Set(
+        module.steps.filter((s: any) => s.type !== StepType.INFO).map((s: any) => s.id)
+      );
+      return module.submissions.filter((s: any) => nonInfoStepIds.has(s.stepId));
+    });
     
     const aiScores = allSubmissions
       .map((s: any) => s.aiScore)

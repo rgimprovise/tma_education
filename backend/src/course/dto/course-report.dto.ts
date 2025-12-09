@@ -24,6 +24,9 @@ export interface CourseReportData {
   
   // Проблемные модули и шаги
   problems: ProblemReport[];
+  
+  // Список всех учеников с прогрессом
+  learnersProgress: LearnerProgressData[];
 }
 
 /**
@@ -260,5 +263,34 @@ export interface ProblemReport {
       threshold: number;
     };
   }[];
+}
+
+/**
+ * Прогресс ученика
+ */
+export interface LearnerProgressData {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  position: string | null;
+  modulesCompleted: number;
+  modulesInProgress: number;
+  totalSubmissions: number;
+  approvedSubmissions: number;
+  returnedSubmissions: number;
+  avgScore: number | null;
+  lowScores: Array<{
+    moduleIndex: number;
+    moduleTitle: string;
+    stepIndex: number | string;
+    stepTitle: string;
+    score: number;
+  }>;
+  returnedSteps: Array<{
+    moduleIndex: number;
+    moduleTitle: string;
+    stepIndex: number | string;
+    stepTitle: string;
+  }>;
 }
 

@@ -202,8 +202,8 @@ export function buildCourseReportHtml(report: CourseReportData): string {
     ${buildSummary(report)}
     ${buildModulesTable(report)}
     ${buildProblems(report)}
+    ${buildLearnersProgress(report)}
     ${buildStepsTable(report)}
-    ${buildPositionsTable(report)}
     ${buildFooter()}
   </div>
 </body>
@@ -328,44 +328,90 @@ function buildModulesTable(report: CourseReportData): string {
  * Построить проблемные зоны
  */
 function buildProblems(report: CourseReportData): string {
-  if (report.problems.length === 0) {
-    return `
-      <div class="section">
-        <h2>Проблемные зоны</h2>
-        <p>Проблемных модулей и шагов не обнаружено.</p>
-      </div>
-    `;
-  }
-  
-  const items = report.problems.map(problem => {
-    const issues = problem.issues.map(issue => {
-      if (issue.lowCompletionRate) {
-        return `Низкий процент завершения: ${formatPercent(issue.lowCompletionRate.rate)}% (порог: ${issue.lowCompletionRate.threshold}%)`;
-      }
-      if (issue.highReturnsPercent) {
-        return `Высокий процент возвратов: ${formatPercent(issue.highReturnsPercent.percent)}% (порог: ${issue.highReturnsPercent.threshold}%)`;
-      }
-      if (issue.lowAvgScore) {
-        return `Низкий средний балл: ${issue.lowAvgScore.score.toFixed(1)}/10 (порог: ${issue.lowAvgScore.threshold})`;
-      }
-      return '';
-    }).filter(Boolean).join('; ');
-    
-    const typeLabel = problem.type === 'module' ? 'Модуль' : 'Шаг';
-    
-    return `
-      <li>
-        <strong>${typeLabel} ${problem.index}: ${escapeHtml(problem.title)}</strong><br>
-        ${issues}
-      </li>
-    `;
-  }).join('');
-  
+  // Проблемные модули и шаги
+  const moduleStepProblems = report.problems.length > 0
+    ? report.problems.map(problem => {
+        const issues = problem.issues.map(issue => {
+          if (issue.lowCompletionRate) {
+            return `Низкий процент завершения: ${formatPercent(issue.lowCompletionRate.rate)}% (порог: ${issue.lowCompletionRate.threshold}%)`;
+          }
+          if (issue.highReturnsPercent) {
+            return `Высокий процент возвратов: ${formatPercent(issue.highReturnsPercent.percent)}% (порог: ${issue.highReturnsPercent.threshold}%)`;
+          }
+          if (issue.lowAvgScore) {
+            return `Низкий средний балл: ${issue.lowAvgScore.score.toFixed(1)}/10 (порог: ${issue.lowAvgScore.threshold})`;
+          }
+          return '';
+        }).filter(Boolean).join('; ');
+        
+        const typeLabel = problem.type === 'module' ? 'Модуль' : 'Шаг';
+        
+        return `
+          <li>
+            <strong>${typeLabel} ${problem.index}: ${escapeHtml(problem.title)}</strong><br>
+            ${issues}
+          </li>
+        `;
+      }).join('')
+    : '<li>Проблемных модулей и шагов не обнаружено.</li>';
+
+  // Проблемные ученики (низкие оценки или возвращенные работы)
+  const problemLearners = report.learnersProgress
+    ? report.learnersProgress.filter(learner => 
+        learner.returnedSubmissions > 0 || learner.lowScores.length > 0
+      )
+    : [];
+
+  const learnerProblems = problemLearners.length > 0
+    ? problemLearners.map(learner => {
+        const fullName = `${learner.firstName} ${learner.lastName}`.trim();
+        const issues: string[] = [];
+        
+        if (learner.returnedSubmissions > 0) {
+          issues.push(`Возвращено работ: ${learner.returnedSubmissions}`);
+          if (learner.returnedSteps.length > 0) {
+            const stepsList = learner.returnedSteps
+              .slice(0, 3)
+              .map(s => `М${s.moduleIndex}.${s.stepIndex} ${s.stepTitle}`)
+              .join(', ');
+            issues.push(`Шаги: ${stepsList}${learner.returnedSteps.length > 3 ? '...' : ''}`);
+          }
+        }
+        
+        if (learner.lowScores.length > 0) {
+          issues.push(`Низкие оценки: ${learner.lowScores.length} работ`);
+          const lowScoresList = learner.lowScores
+            .slice(0, 3)
+            .map(s => `М${s.moduleIndex}.${s.stepIndex} (${s.score.toFixed(1)})`)
+            .join(', ');
+          issues.push(`Примеры: ${lowScoresList}${learner.lowScores.length > 3 ? '...' : ''}`);
+        }
+        
+        if (learner.avgScore !== null && learner.avgScore < 6) {
+          issues.push(`Средний балл ниже 6: ${learner.avgScore.toFixed(1)}`);
+        }
+        
+        return `
+          <li>
+            <strong>${escapeHtml(fullName)}</strong><br>
+            ${issues.join('; ')}
+          </li>
+        `;
+      }).join('')
+    : '<li>Проблемных учеников не обнаружено.</li>';
+
   return `
     <div class="section">
       <h2>Проблемные зоны</h2>
+      
+      <h3>Модули и шаги</h3>
       <ul class="problems-list">
-        ${items}
+        ${moduleStepProblems}
+      </ul>
+      
+      <h3>Ученики с проблемами</h3>
+      <ul class="problems-list">
+        ${learnerProblems}
       </ul>
     </div>
   `;
@@ -433,49 +479,61 @@ function buildStepsTable(report: CourseReportData): string {
 }
 
 /**
- * Построить таблицу по должностям
+ * Построить список всех учеников с прогрессом
  */
-function buildPositionsTable(report: CourseReportData): string {
-  if (report.positions.length === 0) {
+function buildLearnersProgress(report: CourseReportData): string {
+  if (!report.learnersProgress || report.learnersProgress.length === 0) {
     return `
       <div class="section">
-        <h2>Разрез по должностям</h2>
-        <p>Данных по должностям нет.</p>
+        <h2>Список учеников</h2>
+        <p>Данных по ученикам нет.</p>
       </div>
     `;
   }
-  
-  const rows = report.positions.map(position => {
-    const positionName = position.position || 'Не указана';
-    const avgScore = position.submissionStats.avgScore !== null 
-      ? position.submissionStats.avgScore.toFixed(1)
-      : '—';
-    const avgReturns = position.submissionStats.total > 0 && position.learnersCount > 0
-      ? (position.submissionStats.total - position.submissionStats.approved) / position.learnersCount
-      : 0;
+
+  const rows = report.learnersProgress.map(learner => {
+    const fullName = `${learner.firstName} ${learner.lastName}`.trim();
+    const position = learner.position || '—';
+    const avgScore = learner.avgScore !== null ? learner.avgScore.toFixed(1) : '—';
+    const scoreBadge = learner.avgScore !== null && learner.avgScore < 6
+      ? '<span class="tag badge-bad">Низкий</span>'
+      : learner.avgScore !== null && learner.avgScore >= 8
+      ? '<span class="tag badge-ok">Высокий</span>'
+      : '';
     
+    const hasProblems = learner.returnedSubmissions > 0 || learner.lowScores.length > 0;
+    const problemBadge = hasProblems ? '<span class="tag badge-warn">⚠️ Проблемы</span>' : '';
+
     return `
       <tr>
-        <td>${escapeHtml(positionName)}</td>
-        <td class="text-center">${position.learnersCount}</td>
-        <td class="text-center">${formatPercent(position.enrollmentStats.avgCompletionPercent)}</td>
-        <td class="text-center">${avgScore}</td>
-        <td class="text-center">${avgReturns.toFixed(1)}</td>
+        <td>${escapeHtml(fullName)}</td>
+        <td>${escapeHtml(position)}</td>
+        <td class="text-center">${learner.modulesCompleted}</td>
+        <td class="text-center">${learner.modulesInProgress}</td>
+        <td class="text-center">${learner.totalSubmissions}</td>
+        <td class="text-center">${learner.approvedSubmissions}</td>
+        <td class="text-center">${learner.returnedSubmissions > 0 ? `<span class="tag badge-warn">${learner.returnedSubmissions}</span>` : '0'}</td>
+        <td class="text-center">${avgScore} ${scoreBadge}</td>
+        <td class="text-center">${problemBadge}</td>
       </tr>
     `;
   }).join('');
-  
+
   return `
     <div class="section">
-      <h2>Разрез по должностям</h2>
+      <h2>Список всех учеников</h2>
       <table>
         <thead>
           <tr>
+            <th>Имя</th>
             <th>Должность</th>
-            <th>Участников</th>
-            <th>Средний % завершения</th>
+            <th>Завершено модулей</th>
+            <th>В процессе</th>
+            <th>Всего сдач</th>
+            <th>Одобрено</th>
+            <th>Возвращено</th>
             <th>Средний балл</th>
-            <th>Среднее возвратов на участника</th>
+            <th>Статус</th>
           </tr>
         </thead>
         <tbody>
