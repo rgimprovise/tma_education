@@ -144,6 +144,40 @@ async function findAndSendAudio() {
 
       const userIds = users.map(u => u.id);
 
+      // Проверяем все submissions этих учеников (для отладки)
+      const allSubmissions = await prisma.submission.findMany({
+        where: {
+          userId: { in: userIds },
+        },
+        select: {
+          id: true,
+          answerFileId: true,
+          answerType: true,
+          answerText: true,
+          userId: true,
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      });
+
+      console.log(`\n📊 Статистика по submissions:`);
+      users.forEach(user => {
+        const userSubs = allSubmissions.filter(s => s.userId === user.id);
+        const audioSubs = userSubs.filter(s => s.answerFileId && (s.answerType === 'AUDIO' || s.answerType === 'VIDEO'));
+        console.log(`   ${user.firstName} ${user.lastName}:`);
+        console.log(`      Всего submissions: ${userSubs.length}`);
+        console.log(`      С аудиофайлами: ${audioSubs.length}`);
+        if (audioSubs.length > 0) {
+          audioSubs.forEach(s => {
+            console.log(`         - ${s.id} (${s.answerType}, транскрипт: ${s.answerText ? 'есть' : 'нет'})`);
+          });
+        }
+      });
+
       submissions = await prisma.submission.findMany({
         where: {
           answerFileId: { not: null },
