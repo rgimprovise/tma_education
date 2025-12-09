@@ -28,14 +28,55 @@ interface Learner {
 type SortOption = 'name' | 'progress' | 'submissions' | 'pending' | 'returned' | 'resubmission';
 type FilterOption = 'all' | 'pending' | 'returned' | 'resubmission' | 'completed';
 
+const STORAGE_KEY = 'curator_learners_filters';
+
+interface StoredFilters {
+  sortBy: SortOption;
+  filterBy: FilterOption;
+  searchQuery: string;
+}
+
+function loadFiltersFromStorage(): StoredFilters {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return {
+        sortBy: parsed.sortBy || 'name',
+        filterBy: parsed.filterBy || 'all',
+        searchQuery: parsed.searchQuery || '',
+      };
+    }
+  } catch (e) {
+    console.error('Failed to load filters from storage:', e);
+  }
+  return {
+    sortBy: 'name',
+    filterBy: 'all',
+    searchQuery: '',
+  };
+}
+
+function saveFiltersToStorage(filters: StoredFilters) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
+  } catch (e) {
+    console.error('Failed to save filters to storage:', e);
+  }
+}
+
 export function CuratorDashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [learners, setLearners] = useState<Learner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<SortOption>('name');
-  const [filterBy, setFilterBy] = useState<FilterOption>('all');
+  
+  // Загружаем состояние из localStorage при инициализации
+  const storedFilters = loadFiltersFromStorage();
+  const [sortBy, setSortBy] = useState<SortOption>(storedFilters.sortBy);
+  const [filterBy, setFilterBy] = useState<FilterOption>(storedFilters.filterBy);
+  const [searchQuery, setSearchQuery] = useState<string>(storedFilters.searchQuery);
   const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
@@ -59,9 +100,29 @@ export function CuratorDashboardPage() {
     loadData();
   }, []);
 
+  // Сохраняем состояние при изменении фильтров
+  useEffect(() => {
+    saveFiltersToStorage({ sortBy, filterBy, searchQuery });
+  }, [sortBy, filterBy, searchQuery]);
+
   // Функции сортировки и фильтрации
   const getFilteredAndSortedLearners = () => {
     let filtered = [...learners];
+
+    // Поиск по имени
+    if (searchQuery.trim()) {
+      const query = searchQuery.trim().toLowerCase();
+      filtered = filtered.filter((l) => {
+        const fullName = `${l.firstName || ''} ${l.lastName || ''}`.trim().toLowerCase();
+        const position = (l.position || '').toLowerCase();
+        const telegramId = l.telegramId ? String(l.telegramId) : '';
+        return (
+          fullName.includes(query) ||
+          position.includes(query) ||
+          telegramId.includes(query)
+        );
+      });
+    }
 
     // Фильтрация
     if (filterBy === 'pending') {
@@ -202,8 +263,20 @@ export function CuratorDashboardPage() {
         </div>
       )}
 
-      {/* Фильтры и сортировка */}
+      {/* Поиск, фильтры и сортировка */}
       <div className="filters-section">
+        <div className="filter-group" style={{ flex: '1 1 100%', minWidth: '200px' }}>
+          <label htmlFor="search-input" className="filter-label">Поиск:</label>
+          <input
+            id="search-input"
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Поиск по имени, должности, Telegram ID..."
+            className="filter-select"
+            style={{ width: '100%' }}
+          />
+        </div>
         <div className="filter-group">
           <label htmlFor="sort-select" className="filter-label">Сортировка:</label>
           <select
