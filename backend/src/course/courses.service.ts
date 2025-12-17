@@ -1,10 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-
-export interface CreateCourseDto {
-  title: string;
-  description?: string;
-}
+import { CreateCourseDto } from './dto/create-course.dto';
+import { UpdateCourseDto } from './dto/update-course.dto';
 
 @Injectable()
 export class CoursesService {
@@ -99,6 +96,89 @@ export class CoursesService {
         title: dto.title,
         description: dto.description,
       },
+    });
+  }
+
+  /**
+   * Обновить курс
+   */
+  async updateCourse(id: string, dto: UpdateCourseDto) {
+    const course = await this.prisma.course.findUnique({ where: { id } });
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    return this.prisma.course.update({
+      where: { id },
+      data: {
+        title: dto.title,
+        description: dto.description,
+      },
+    });
+  }
+
+  /**
+   * Удалить курс (запрещаем, если к нему привязаны модули)
+   */
+  async deleteCourse(id: string) {
+    const course = await this.prisma.course.findUnique({
+      where: { id },
+      include: { modules: { select: { id: true } } },
+    });
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+    if (course.modules.length > 0) {
+      throw new BadRequestException(
+        'Cannot delete course with modules attached. Detach or delete modules first.',
+      );
+    }
+
+    await this.prisma.course.delete({ where: { id } });
+    return { message: 'Course deleted successfully' };
+  }
+
+  /**
+   * Привязать существующий модуль к курсу
+   */
+  async attachModule(courseId: string, moduleId: string) {
+    const course = await this.prisma.course.findUnique({ where: { id: courseId } });
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    const module = await this.prisma.courseModule.findUnique({ where: { id: moduleId } });
+    if (!module) {
+      throw new NotFoundException('Module not found');
+    }
+
+    return this.prisma.courseModule.update({
+      where: { id: moduleId },
+      data: { courseId },
+    });
+  }
+
+  /**
+   * Отвязать модуль от курса
+   */
+  async detachModule(courseId: string, moduleId: string) {
+    const course = await this.prisma.course.findUnique({ where: { id: courseId } });
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    const module = await this.prisma.courseModule.findUnique({ where: { id: moduleId } });
+    if (!module) {
+      throw new NotFoundException('Module not found');
+    }
+
+    if (module.courseId !== courseId) {
+      throw new BadRequestException('Module is not attached to this course');
+    }
+
+    return this.prisma.courseModule.update({
+      where: { id: moduleId },
+      data: { courseId: null },
     });
   }
 }

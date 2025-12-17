@@ -1,14 +1,16 @@
-import { Controller, Get, Post, Param, Body, UseGuards, Res, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Res, Request } from '@nestjs/common';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { CoursesService, CreateCourseDto } from './courses.service';
+import { CoursesService } from './courses.service';
 import { CourseReportService } from './course-report.service';
 import { buildCourseReportHtml } from './course-report-html.builder';
 import { TelegramService } from '../telegram/telegram.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
+import { CreateCourseDto } from './dto/create-course.dto';
+import { UpdateCourseDto } from './dto/update-course.dto';
 
 /**
  * CourseCoursesController - управление курсами (верхний уровень)
@@ -51,6 +53,52 @@ export class CourseCoursesController {
   @Roles(UserRole.ADMIN)
   async createCourse(@Body() dto: CreateCourseDto) {
     return this.coursesService.createCourse(dto);
+  }
+
+  /**
+   * PATCH /admin/courses/:id
+   * Обновить курс
+   */
+  @Patch(':id')
+  @Roles(UserRole.ADMIN)
+  async updateCourse(@Param('id') id: string, @Body() dto: UpdateCourseDto) {
+    return this.coursesService.updateCourse(id, dto);
+  }
+
+  /**
+   * DELETE /admin/courses/:id
+   * Удалить курс (если нет привязанных модулей)
+   */
+  @Delete(':id')
+  @Roles(UserRole.ADMIN)
+  async deleteCourse(@Param('id') id: string) {
+    return this.coursesService.deleteCourse(id);
+  }
+
+  /**
+   * POST /admin/courses/:courseId/modules/:moduleId/attach
+   * Привязать существующий модуль к курсу
+   */
+  @Post(':courseId/modules/:moduleId/attach')
+  @Roles(UserRole.ADMIN)
+  async attachModule(
+    @Param('courseId') courseId: string,
+    @Param('moduleId') moduleId: string,
+  ) {
+    return this.coursesService.attachModule(courseId, moduleId);
+  }
+
+  /**
+   * POST /admin/courses/:courseId/modules/:moduleId/detach
+   * Отвязать модуль от курса
+   */
+  @Post(':courseId/modules/:moduleId/detach')
+  @Roles(UserRole.ADMIN)
+  async detachModule(
+    @Param('courseId') courseId: string,
+    @Param('moduleId') moduleId: string,
+  ) {
+    return this.coursesService.detachModule(courseId, moduleId);
   }
 
   /**
