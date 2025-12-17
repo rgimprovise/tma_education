@@ -45,7 +45,9 @@ export function CourseStepEditorPage() {
   });
   const [formFields, setFormFields] = useState<FormField[]>([]);
 
-  const isNew = stepId === 'new';
+  // В роуте создания шага (`/curator/course/modules/:moduleId/steps/new`) параметр stepId отсутствует,
+  // поэтому считаем создание и при stepId === undefined.
+  const isNew = !stepId || stepId === 'new';
 
   useEffect(() => {
     if (!isNew && stepId) {

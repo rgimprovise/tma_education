@@ -27,7 +27,9 @@ export function CourseModuleEditorPage() {
     isExam: false,
   });
 
-  const isNew = moduleId === 'new';
+  // В роуте создания модуля (`/curator/course/modules/new`) параметр moduleId отсутствует,
+  // поэтому считаем создание и при moduleId === undefined.
+  const isNew = !moduleId || moduleId === 'new';
 
   useEffect(() => {
     if (!isNew && moduleId) {
