@@ -138,6 +138,8 @@
   color: var(--tg-theme-text-color, #000000);
   font-size: 15px;
   line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .answer-file {
