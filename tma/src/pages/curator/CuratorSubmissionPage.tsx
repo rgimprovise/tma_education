@@ -287,6 +287,24 @@ export function CuratorSubmissionPage() {
     }
   };
 
+  const renderMultilineText = (value: unknown) => {
+    if (value === null || value === undefined) return '(не заполнено)';
+    const text = String(value);
+    // Поддержка случаев, когда переносы пришли как "\\n" (строка с экранированием)
+    const normalized = text.replace(/\\n/g, '\n').replace(/\r\n/g, '\n');
+    const parts = normalized.split('\n');
+    return (
+      <>
+        {parts.map((part, idx) => (
+          <span key={idx}>
+            {part}
+            {idx < parts.length - 1 && <br />}
+          </span>
+        ))}
+      </>
+    );
+  };
+
   const renderAnswerContent = () => {
     if (!submission) return null;
 
@@ -306,7 +324,7 @@ export function CuratorSubmissionPage() {
           {isAudioVideo && submission.answerText && (
             <div className="transcription-block">
               <div className="transcription-title">📝 Транскрипт:</div>
-              <div className="transcription-text">{submission.answerText}</div>
+              <div className="transcription-text">{renderMultilineText(submission.answerText)}</div>
             </div>
           )}
           
@@ -333,14 +351,14 @@ export function CuratorSubmissionPage() {
     // Если answerFileId нет, проверяем formSchema и текстовые ответы
     if (submission.step.formSchema && submission.answerText) {
       try {
-        const answersObj = JSON.parse(submission.answerText);
+        const answersObj = JSON.parse(submission.answerText) as Record<string, unknown>;
         return (
           <div className="form-answers">
             {submission.step.formSchema.fields.map((field) => (
               <div key={field.id} className="form-answer-item">
                 <div className="form-answer-label">{field.label}:</div>
                 <div className="form-answer-value">
-                  {answersObj[field.id] || '(не заполнено)'}
+                  {renderMultilineText(answersObj[field.id])}
                 </div>
               </div>
             ))}
@@ -350,7 +368,7 @@ export function CuratorSubmissionPage() {
         // Если не удалось распарсить — показываем как текст
         return (
           <div className="answer-text">
-            {submission.answerText}
+            {renderMultilineText(submission.answerText)}
           </div>
         );
       }
@@ -360,7 +378,7 @@ export function CuratorSubmissionPage() {
     if (submission.answerText) {
       return (
         <div className="answer-text">
-          {submission.answerText}
+          {renderMultilineText(submission.answerText)}
         </div>
       );
     }
