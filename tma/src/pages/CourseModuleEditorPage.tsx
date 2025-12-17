@@ -26,6 +26,9 @@ export function CourseModuleEditorPage() {
     index: 1,
     isExam: false,
   });
+  // Для input type="number" держим строковое состояние, чтобы можно было очистить поле
+  // (иначе при parseInt('') мы принудительно возвращаем 1 и "1" не удаляется).
+  const [indexInput, setIndexInput] = useState<string>('1');
 
   // В роуте создания модуля (`/curator/course/modules/new`) параметр moduleId отсутствует,
   // поэтому считаем создание и при moduleId === undefined.
@@ -47,6 +50,7 @@ export function CourseModuleEditorPage() {
         index: response.data.index || 1,
         isExam: response.data.isExam || false,
       });
+      setIndexInput(String(response.data.index || 1));
     } catch (err: any) {
       console.error('Failed to load module:', err);
       alert(err.response?.data?.message || 'Ошибка загрузки модуля');
@@ -58,10 +62,20 @@ export function CourseModuleEditorPage() {
   const handleSave = async () => {
     try {
       setSaving(true);
+      const parsedIndex = Number(indexInput);
+      if (!Number.isFinite(parsedIndex) || parsedIndex < 1 || parsedIndex > 10) {
+        alert('❌ Пожалуйста, укажите корректный порядковый номер модуля (1–10)');
+        return;
+      }
+
+      const payload = {
+        ...formData,
+        index: parsedIndex,
+      };
       if (isNew) {
-        await api.post('/admin/course/modules', formData);
+        await api.post('/admin/course/modules', payload);
       } else {
-        await api.patch(`/admin/course/modules/${moduleId}`, formData);
+        await api.patch(`/admin/course/modules/${moduleId}`, payload);
       }
       
       // Возвращаемся на правильную страницу
@@ -126,8 +140,16 @@ export function CourseModuleEditorPage() {
               type="number"
               min="1"
               max="10"
-              value={formData.index}
-              onChange={(e) => setFormData({ ...formData, index: parseInt(e.target.value) || 1 })}
+              value={indexInput}
+              onChange={(e) => {
+                const v = e.target.value;
+                setIndexInput(v);
+                // Держим formData.index синхронизированным, но не мешаем вводу пустого значения
+                const n = Number(v);
+                if (v !== '' && Number.isFinite(n)) {
+                  setFormData({ ...formData, index: n });
+                }
+              }}
             />
           </div>
 
