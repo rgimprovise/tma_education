@@ -832,10 +832,29 @@ ${submission.curatorFeedback || 'Требуется доработка'}
     const replyToMessageId = ctx.message?.reply_to_message?.message_id;
     if (!replyToMessageId) {
       this.logger.warn(`${messageType} from ${telegramId} is not a reply to bot message`);
-      await ctx.reply(
-        '⚠️ Чтобы сдать аудио-задание, отправьте голосовое сообщение **ответом (реплаем)** на инструкцию бота.',
-        { parse_mode: 'Markdown' }
-      );
+      
+      // Пытаемся найти активные сдачи и вернуть их на доработку
+      try {
+        const { AudioSubmissionsService } = await import('../submissions/audio-submissions.service');
+        const audioSubmissionsService = this.moduleRef.get(AudioSubmissionsService, { strict: false });
+        
+        if (audioSubmissionsService) {
+          const result = await audioSubmissionsService.handleVoiceMessageWithoutReply(telegramId);
+          await ctx.reply(result.message, { parse_mode: 'Markdown' });
+        } else {
+          // Fallback на старое сообщение, если сервис недоступен
+          await ctx.reply(
+            '⚠️ Чтобы сдать аудио-задание, отправьте голосовое сообщение **ответом (реплаем)** на инструкцию бота.',
+            { parse_mode: 'Markdown' }
+          );
+        }
+      } catch (error: any) {
+        this.logger.error(`Error handling voice message without reply: ${error.message}`);
+        await ctx.reply(
+          '⚠️ Чтобы сдать аудио-задание, отправьте голосовое сообщение **ответом (реплаем)** на инструкцию бота.',
+          { parse_mode: 'Markdown' }
+        );
+      }
       return;
     }
 

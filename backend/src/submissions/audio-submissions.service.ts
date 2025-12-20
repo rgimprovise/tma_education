@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { PrismaService } from '../prisma/prisma.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { AiService } from '../ai/ai.service';
@@ -17,6 +18,7 @@ export class AudioSubmissionsService {
     private prisma: PrismaService,
     private telegramService: TelegramService,
     private aiService: AiService,
+    private moduleRef: ModuleRef,
   ) {}
 
   /**
@@ -158,6 +160,133 @@ export class AudioSubmissionsService {
       throw new BadRequestException(
         'You have already submitted this step. Please wait for curator review or request resubmission.',
       );
+    }
+  }
+
+  /**
+   * Обработать голосовое/видео сообщение без reply
+   * Находит активные сдачи с аудио/видео, возвращает их на доработку и отправляет инструкцию повторно
+   */
+  async handleVoiceMessageWithoutReply(
+    telegramId: string,
+  ): Promise<{ found: boolean; message: string }> {
+    this.logger.log(`[handleVoiceMessageWithoutReply] Processing for telegramId=${telegramId}`);
+    
+    try {
+      // 1. Найти пользователя
+      const user = await this.prisma.user.findUnique({
+        where: { telegramId },
+        select: { id: true, telegramId: true, firstName: true, lastName: true },
+      });
+      
+      if (!user) {
+        this.logger.warn(`[handleVoiceMessageWithoutReply] User not found: ${telegramId}`);
+        return {
+          found: false,
+          message: '❌ Пользователь не найден в системе.',
+        };
+      }
+      
+      // 2. Найти активные сдачи с аудио/видео (статус SENT или AI_REVIEWED, без answerFileId)
+      const activeSubmissions = await this.prisma.submission.findMany({
+        where: {
+          userId: user.id,
+          answerType: {
+            in: ['AUDIO', 'VIDEO'],
+          },
+          status: {
+            in: ['SENT', 'AI_REVIEWED'],
+          },
+          answerFileId: null, // Только те, где файл не был получен
+        },
+        include: {
+          step: {
+            select: {
+              id: true,
+              title: true,
+              expectedAnswer: true,
+            },
+          },
+          module: {
+            select: {
+              id: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc', // Самые свежие сначала
+        },
+      });
+      
+      if (activeSubmissions.length === 0) {
+        this.logger.log(`[handleVoiceMessageWithoutReply] No active audio/video submissions found for ${telegramId}`);
+        return {
+          found: false,
+          message: '⚠️ У вас нет активных заданий с аудио/видео ответом. Чтобы сдать задание, отправьте голосовое сообщение **ответом (реплаем)** на инструкцию бота.',
+        };
+      }
+      
+      this.logger.log(`[handleVoiceMessageWithoutReply] Found ${activeSubmissions.length} active submissions for ${telegramId}`);
+      
+      // 3. Для каждой сдачи: вернуть на доработку и отправить инструкцию
+      const { SubmissionsService } = await import('./submissions.service');
+      const submissionsService = this.moduleRef.get(SubmissionsService, { strict: false });
+      
+      if (!submissionsService) {
+        throw new Error('SubmissionsService not found in ModuleRef');
+      }
+      
+      let processedCount = 0;
+      for (const submission of activeSubmissions) {
+        try {
+          // Возвращаем на доработку
+          await submissionsService.updateStatus(
+            submission.id,
+            'CURATOR_RETURNED',
+            undefined,
+            'Автоматический возврат: ответ отправлен без reply на инструкцию бота. Пожалуйста, отправьте ответ реплаем на новую инструкцию.',
+          );
+          
+          // Отправляем инструкцию повторно
+          await this.startAudioSubmission(
+            user.id,
+            submission.stepId,
+            submission.moduleId,
+          );
+          
+          processedCount++;
+          this.logger.log(`[handleVoiceMessageWithoutReply] Processed submission ${submission.id} for step ${submission.step.title}`);
+        } catch (error: any) {
+          this.logger.error(`[handleVoiceMessageWithoutReply] Error processing submission ${submission.id}:`, error);
+          // Продолжаем обработку остальных
+        }
+      }
+      
+      if (processedCount > 0) {
+        const stepTitles = activeSubmissions
+          .slice(0, processedCount)
+          .map(s => `"${s.step.title}"`)
+          .join(', ');
+        
+        return {
+          found: true,
+          message: `⚠️ Вы отправили ${processedCount === 1 ? 'сообщение' : 'сообщения'} без ответа на инструкцию бота.\n\n` +
+                   `📝 Задание${processedCount > 1 ? 'я' : ''}: ${stepTitles}\n\n` +
+                   `✅ Я вернул ${processedCount === 1 ? 'его' : 'их'} на доработку и отправил новую инструкцию.\n\n` +
+                   `⚠️ **Важно:** Отправьте ваш ответ **ответом (реплаем)** на новое сообщение с инструкцией, иначе бот не сможет связать его с заданием.`,
+        };
+      }
+      
+      return {
+        found: false,
+        message: '⚠️ Не удалось обработать ваши сдачи. Попробуйте позже или обратитесь к куратору.',
+      };
+    } catch (error: any) {
+      this.logger.error(`[handleVoiceMessageWithoutReply] Error:`, error);
+      return {
+        found: false,
+        message: '❌ Произошла ошибка при обработке. Попробуйте позже или обратитесь к куратору.',
+      };
     }
   }
 
