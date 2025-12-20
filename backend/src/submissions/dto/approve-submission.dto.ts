@@ -1,13 +1,13 @@
-import { IsNumber, IsOptional, IsString, Min, Max } from 'class-validator';
+import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 /**
  * DTO для одобрения сдачи
+ * Валидация максимальной оценки происходит в сервисе на основе maxScore шага
  */
 export class ApproveSubmissionDto {
   @IsNumber()
   @IsOptional()
   @Min(0)
-  @Max(10)
   curatorScore?: number;
 
   @IsString()

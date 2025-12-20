@@ -27,6 +27,7 @@ interface Submission {
     id: string;
     title: string;
     index: number;
+    maxScore: number;
   };
   module: {
     id: string;
@@ -327,12 +328,12 @@ export function CuratorUserPage() {
               )}
               {submission.aiScore !== null && submission.aiScore !== undefined && (
                 <div className="submission-score">
-                  Оценка ИИ: {submission.aiScore}/10
+                  Оценка ИИ: {submission.aiScore}/{submission.step.maxScore}
                 </div>
               )}
               {submission.curatorScore !== null && submission.curatorScore !== undefined && (
                 <div className="submission-score">
-                  Оценка куратора: {submission.curatorScore}/10
+                  Оценка куратора: {submission.curatorScore}/{submission.step.maxScore}
                 </div>
               )}
               <div className="submission-date">

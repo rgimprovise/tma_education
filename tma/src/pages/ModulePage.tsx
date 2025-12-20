@@ -9,6 +9,7 @@ interface Step {
   type: 'INFO' | 'TASK' | 'QUIZ' | 'EXAM';
   title: string;
   content: string;
+  maxScore: number;
   submission?: {
     id: string;
     status: string;
@@ -135,12 +136,12 @@ export function ModulePage() {
                   </div>
                   {step.submission.aiScore !== null && step.submission.aiScore !== undefined && (
                     <div className="step-score">
-                      Оценка ИИ: {step.submission.aiScore}/10
+                      Оценка ИИ: {step.submission.aiScore}/{step.maxScore}
                     </div>
                   )}
                   {step.submission.curatorScore !== null && step.submission.curatorScore !== undefined && (
                     <div className="step-score">
-                      Оценка куратора: {step.submission.curatorScore}/10
+                      Оценка куратора: {step.submission.curatorScore}/{step.maxScore}
                     </div>
                   )}
                 </div>

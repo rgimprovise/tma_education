@@ -614,8 +614,9 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     const userName = `${submission.user?.firstName || ''} ${submission.user?.lastName || ''}`.trim() || 'Участник';
     const moduleIndex = submission.module?.index || '?';
     const stepIndex = submission.step?.index || '?';
+    const maxScore = submission.step?.maxScore || 10;
     const aiScore = submission.aiScore !== null && submission.aiScore !== undefined 
-      ? `${submission.aiScore}/10` 
+      ? `${submission.aiScore}/${maxScore}` 
       : 'не оценено';
 
     // Очищаем aiFeedback от JSON-форматирования, если оно там есть
@@ -680,6 +681,7 @@ ${aiFeedbackText ? `💬 Комментарий ИИ:\n${aiFeedbackText}\n` : ''
   ): Promise<void> {
     const moduleIndex = submission.module?.index || '?';
     const stepTitle = submission.step?.title || 'Задание';
+    const maxScore = submission.step?.maxScore || 10;
 
     if (submission.status === 'CURATOR_APPROVED') {
       const message = `✅ Ваша сдача одобрена!
@@ -687,7 +689,7 @@ ${aiFeedbackText ? `💬 Комментарий ИИ:\n${aiFeedbackText}\n` : ''
 📚 Модуль: ${moduleIndex}
 📝 Задание: ${stepTitle}
 
-${submission.curatorScore !== null ? `⭐ Оценка: ${submission.curatorScore}/10\n` : ''}
+${submission.curatorScore !== null ? `⭐ Оценка: ${submission.curatorScore}/${maxScore}\n` : ''}
 ${submission.curatorFeedback ? `💬 Комментарий куратора:\n${submission.curatorFeedback}` : ''}
 
 Продолжайте в том же духе! 🎉`;

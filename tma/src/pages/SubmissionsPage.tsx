@@ -11,6 +11,7 @@ interface Submission {
   status: string;
   step: {
     title: string;
+    maxScore: number;
   };
   module: {
     index: number;
@@ -48,7 +49,7 @@ export function SubmissionsPage() {
             </h3>
             <p>Статус: {submission.status}</p>
             {submission.aiScore !== null && (
-              <p>Оценка ИИ: {submission.aiScore}/10</p>
+              <p>Оценка ИИ: {submission.aiScore}/{submission.step.maxScore}</p>
             )}
             {submission.aiFeedback && (
               <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#f5f5f5' }}>
@@ -57,7 +58,7 @@ export function SubmissionsPage() {
               </div>
             )}
             {submission.curatorScore !== null && (
-              <p>Оценка куратора: {submission.curatorScore}/10</p>
+              <p>Оценка куратора: {submission.curatorScore}/{submission.step.maxScore}</p>
             )}
             {submission.curatorFeedback && (
               <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#e8f5e9' }}>

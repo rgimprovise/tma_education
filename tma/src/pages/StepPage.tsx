@@ -17,6 +17,7 @@ interface Step {
   content: string;
   type: 'INFO' | 'TASK' | 'QUIZ' | 'EXAM';
   expectedAnswer: 'TEXT' | 'AUDIO' | 'VIDEO' | 'FILE';
+  maxScore: number;
   formSchema?: {
     fields: FormField[];
   };
@@ -468,7 +469,7 @@ export function StepPage() {
               {/* Блок ИИ - ТОЛЬКО для кураторов/админов */}
               {!isLearner && step.submission.aiScore !== null && step.submission.aiScore !== undefined && (
                 <div className="feedback-block ai-feedback">
-                  <div className="feedback-title">🤖 Оценка ИИ: {step.submission.aiScore}/10</div>
+                  <div className="feedback-title">🤖 Оценка ИИ: {step.submission.aiScore}/{step.maxScore}</div>
                   {step.submission.aiFeedback && (
                     <div className="feedback-text">{step.submission.aiFeedback}</div>
                   )}
@@ -479,7 +480,7 @@ export function StepPage() {
               {step.submission.curatorScore !== null && step.submission.curatorScore !== undefined && (
                 <div className="feedback-block curator-feedback">
                   <div className="feedback-title">
-                    ✅ Оценка куратора: {step.submission.curatorScore}/10
+                    ✅ Оценка куратора: {step.submission.curatorScore}/{step.maxScore}
                   </div>
                   {step.submission.curatorFeedback && (
                     <div className="feedback-text">{step.submission.curatorFeedback}</div>
