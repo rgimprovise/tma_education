@@ -292,7 +292,7 @@ export class AudioSubmissionsService {
 
   /**
    * Обработать голосовое/видео сообщение от пользователя
-   * 1. Найти Submission по reply_to_message_id
+   * 1. Найти Submission (по reply_to_message_id или последнюю активную сдачу)
    * 2. Скачать файл из Telegram
    * 3. Транскрибировать через Whisper
    * 4. Оценить через AI
@@ -301,10 +301,10 @@ export class AudioSubmissionsService {
    */
   async processVoiceSubmission(
     telegramId: string,
-    replyToMessageId: number,
+    replyToMessageId: number | null,
     fileId: string,
   ): Promise<void> {
-    this.logger.log(`[processVoiceSubmission] Starting for telegramId=${telegramId}, replyTo=${replyToMessageId}, fileId=${fileId}`);
+    this.logger.log(`[processVoiceSubmission] Starting for telegramId=${telegramId}, replyTo=${replyToMessageId || 'none'}, fileId=${fileId}`);
     
     try {
       // 1. Найти пользователя
@@ -321,38 +321,93 @@ export class AudioSubmissionsService {
       
       this.logger.debug(`[processVoiceSubmission] User found: ${user.id}`);
 
-      // 2. Найти Submission по telegramPromptMessageId
-      this.logger.debug(`[processVoiceSubmission] Looking up submission by replyToMessageId: ${replyToMessageId}`);
-      const submission = await this.prisma.submission.findFirst({
-        where: {
-          userId: user.id,
-          telegramPromptMessageId: replyToMessageId,
-        },
-        include: {
-          step: {
-            select: {
-              id: true,
-              title: true,
-              content: true,
-              maxScore: true,
-              aiRubric: true,
-              requiresAiReview: true,
+      // 2. Найти Submission
+      let submission = null;
+      
+      if (replyToMessageId) {
+        // Если есть reply - ищем по telegramPromptMessageId (надежнее)
+        this.logger.debug(`[processVoiceSubmission] Looking up submission by replyToMessageId: ${replyToMessageId}`);
+        submission = await this.prisma.submission.findFirst({
+          where: {
+            userId: user.id,
+            telegramPromptMessageId: replyToMessageId,
+          },
+          include: {
+            step: {
+              select: {
+                id: true,
+                title: true,
+                content: true,
+                maxScore: true,
+                aiRubric: true,
+                requiresAiReview: true,
+              },
+            },
+            module: {
+              select: {
+                id: true,
+                index: true,
+                title: true,
+              },
             },
           },
-          module: {
-            select: {
-              id: true,
-              index: true,
-              title: true,
+        });
+      }
+      
+      // Если не нашли по reply или reply нет - ищем последнюю активную сдачу
+      if (!submission) {
+        this.logger.debug(`[processVoiceSubmission] Looking up last active audio/video submission for user`);
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000); // Последний час
+        
+        submission = await this.prisma.submission.findFirst({
+          where: {
+            userId: user.id,
+            answerType: {
+              in: ['AUDIO', 'VIDEO'],
+            },
+            status: {
+              in: ['SENT', 'AI_REVIEWED'],
+            },
+            answerFileId: null, // Только те, где файл еще не получен
+            createdAt: {
+              gte: oneHourAgo, // Создана не более часа назад
             },
           },
-        },
-      });
+          include: {
+            step: {
+              select: {
+                id: true,
+                title: true,
+                content: true,
+                maxScore: true,
+                aiRubric: true,
+                requiresAiReview: true,
+              },
+            },
+            module: {
+              select: {
+                id: true,
+                index: true,
+                title: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc', // Самая свежая
+          },
+        });
+        
+        if (submission) {
+          this.logger.log(`[processVoiceSubmission] Found active submission without reply: ${submission.id} (step: ${submission.step.title})`);
+        }
+      }
 
       if (!submission) {
         await this.telegramService.sendMessage(
           telegramId,
-          '❌ Не удалось найти задание, к которому вы отправили аудио. Попробуйте начать заново из учебного приложения.',
+          '❌ Не удалось найти активное задание с аудио/видео ответом.\n\n' +
+          '💡 **Совет:** Для более надежной работы отправляйте голосовое сообщение **ответом (реплаем)** на инструкцию бота.\n\n' +
+          'Если вы только что начали сдачу задания, подождите несколько секунд и попробуйте снова.',
         );
         return;
       }

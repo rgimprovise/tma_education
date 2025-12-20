@@ -828,37 +828,14 @@ ${submission.curatorFeedback || 'Требуется доработка'}
 
     this.logger.log(`Received ${messageType} from ${telegramId}`);
 
-    // Проверяем, что это reply на сообщение
-    const replyToMessageId = ctx.message?.reply_to_message?.message_id;
+    // Получаем replyToMessageId (может быть null - это нормально, обработаем)
+    const replyToMessageId = ctx.message?.reply_to_message?.message_id || null;
+    
     if (!replyToMessageId) {
-      this.logger.warn(`${messageType} from ${telegramId} is not a reply to bot message`);
-      
-      // Пытаемся найти активные сдачи и вернуть их на доработку
-      try {
-        const { AudioSubmissionsService } = await import('../submissions/audio-submissions.service');
-        const audioSubmissionsService = this.moduleRef.get(AudioSubmissionsService, { strict: false });
-        
-        if (audioSubmissionsService) {
-          const result = await audioSubmissionsService.handleVoiceMessageWithoutReply(telegramId);
-          await ctx.reply(result.message, { parse_mode: 'Markdown' });
-        } else {
-          // Fallback на старое сообщение, если сервис недоступен
-          await ctx.reply(
-            '⚠️ Чтобы сдать аудио-задание, отправьте голосовое сообщение **ответом (реплаем)** на инструкцию бота.',
-            { parse_mode: 'Markdown' }
-          );
-        }
-      } catch (error: any) {
-        this.logger.error(`Error handling voice message without reply: ${error.message}`);
-        await ctx.reply(
-          '⚠️ Чтобы сдать аудио-задание, отправьте голосовое сообщение **ответом (реплаем)** на инструкцию бота.',
-          { parse_mode: 'Markdown' }
-        );
-      }
-      return;
+      this.logger.log(`${messageType} from ${telegramId} without reply - will try to find active submission`);
+    } else {
+      this.logger.log(`${messageType} from ${telegramId} is reply to message ${replyToMessageId}`);
     }
-
-    this.logger.log(`${messageType} is reply to message ${replyToMessageId}`);
 
     // Получаем file_id
     const fileId = messageType === 'voice' 
@@ -874,7 +851,10 @@ ${submission.curatorFeedback || 'Требуется доработка'}
     this.logger.log(`Processing ${messageType} with file_id: ${fileId}`);
 
     // Отправляем подтверждение получения
-    await ctx.reply('⏳ Обрабатываю ваше аудио-сообщение. Пожалуйста, подождите...');
+    const confirmationMessage = replyToMessageId 
+      ? '⏳ Обрабатываю ваше аудио-сообщение. Пожалуйста, подождите...'
+      : '⏳ Обрабатываю ваше аудио-сообщение. Ищу соответствующее задание...';
+    await ctx.reply(confirmationMessage);
 
     // Вызываем AudioSubmissionsService для обработки
     try {
@@ -887,7 +867,7 @@ ${submission.curatorFeedback || 'Требуется доработка'}
         throw new Error('AudioSubmissionsService not found in ModuleRef');
       }
       
-      this.logger.log(`Calling processVoiceSubmission for ${telegramId}, reply_to: ${replyToMessageId}`);
+      this.logger.log(`Calling processVoiceSubmission for ${telegramId}, reply_to: ${replyToMessageId || 'none'}`);
       
       // Запускаем обработку в фоне (не блокируем обработчик)
       audioSubmissionsService.processVoiceSubmission(telegramId, replyToMessageId, fileId)
