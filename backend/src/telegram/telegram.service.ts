@@ -264,6 +264,39 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       }
     });
 
+    // Обработка обычных видео-файлов (для видео-сдачи заданий)
+    this.bot.on('message:video', async (ctx: Context) => {
+      try {
+        await this.handleVoiceMessage(ctx, 'video');
+      } catch (error) {
+        this.logger.error('Error handling video file:', error);
+        await ctx.reply('❌ Произошла ошибка при обработке видео-файла.');
+      }
+    });
+
+    // Обработка документов (могут быть видео-файлами)
+    this.bot.on('message:document', async (ctx: Context) => {
+      try {
+        const document = ctx.message?.document;
+        if (!document) return;
+
+        // Проверяем, является ли документ видео-файлом
+        const mimeType = document.mime_type || '';
+        const fileName = document.file_name || '';
+        
+        const isVideo = mimeType.startsWith('video/') || 
+                       fileName.match(/\.(mp4|avi|mov|mkv|webm|flv|wmv|m4v)$/i);
+        
+        if (isVideo) {
+          await this.handleVoiceMessage(ctx, 'document_video');
+        }
+        // Если не видео - игнорируем (не обрабатываем другие типы документов)
+      } catch (error) {
+        this.logger.error('Error handling document:', error);
+        await ctx.reply('❌ Произошла ошибка при обработке файла.');
+      }
+    });
+
     // Обработка callback_query для куратора (одобрение/возврат сдачи)
     this.bot.callbackQuery(/^curator_/, async (ctx: Context) => {
       try {
@@ -815,11 +848,11 @@ ${submission.curatorFeedback || 'Требуется доработка'}
   }
 
   /**
-   * Обработка голосовых сообщений и видео-заметок (для аудио-сдачи)
+   * Обработка голосовых сообщений, видео-заметок, видео-файлов и документов (для аудио/видео-сдачи)
    * @param ctx - Контекст сообщения grammY
-   * @param messageType - Тип сообщения ('voice' или 'video_note')
+   * @param messageType - Тип сообщения ('voice', 'video_note', 'video', 'document_video')
    */
-  private async handleVoiceMessage(ctx: Context, messageType: 'voice' | 'video_note') {
+  private async handleVoiceMessage(ctx: Context, messageType: 'voice' | 'video_note' | 'video' | 'document_video') {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) {
       this.logger.warn('Voice message received without telegramId');
@@ -837,14 +870,27 @@ ${submission.curatorFeedback || 'Требуется доработка'}
       this.logger.log(`${messageType} from ${telegramId} is reply to message ${replyToMessageId}`);
     }
 
-    // Получаем file_id
-    const fileId = messageType === 'voice' 
-      ? ctx.message?.voice?.file_id 
-      : ctx.message?.video_note?.file_id;
+    // Получаем file_id в зависимости от типа сообщения
+    let fileId: string | undefined;
+    let fileType: 'AUDIO' | 'VIDEO' = 'AUDIO';
+    
+    if (messageType === 'voice') {
+      fileId = ctx.message?.voice?.file_id;
+      fileType = 'AUDIO';
+    } else if (messageType === 'video_note') {
+      fileId = ctx.message?.video_note?.file_id;
+      fileType = 'VIDEO';
+    } else if (messageType === 'video') {
+      fileId = ctx.message?.video?.file_id;
+      fileType = 'VIDEO';
+    } else if (messageType === 'document_video') {
+      fileId = ctx.message?.document?.file_id;
+      fileType = 'VIDEO';
+    }
     
     if (!fileId) {
       this.logger.error(`Failed to get file_id from ${messageType}`);
-      await ctx.reply('❌ Не удалось получить аудио-файл.');
+      await ctx.reply('❌ Не удалось получить файл.');
       return;
     }
 
@@ -867,10 +913,10 @@ ${submission.curatorFeedback || 'Требуется доработка'}
         throw new Error('AudioSubmissionsService not found in ModuleRef');
       }
       
-      this.logger.log(`Calling processVoiceSubmission for ${telegramId}, reply_to: ${replyToMessageId || 'none'}`);
+      this.logger.log(`Calling processVoiceSubmission for ${telegramId}, reply_to: ${replyToMessageId || 'none'}, fileType: ${fileType}`);
       
       // Запускаем обработку в фоне (не блокируем обработчик)
-      audioSubmissionsService.processVoiceSubmission(telegramId, replyToMessageId, fileId)
+      audioSubmissionsService.processVoiceSubmission(telegramId, replyToMessageId, fileId, fileType)
         .then(() => {
           this.logger.log(`Voice submission processed successfully for ${telegramId}`);
         })

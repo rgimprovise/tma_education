@@ -303,6 +303,7 @@ export class AudioSubmissionsService {
     telegramId: string,
     replyToMessageId: number | null,
     fileId: string,
+    fileType: 'AUDIO' | 'VIDEO' = 'AUDIO',
   ): Promise<void> {
     this.logger.log(`[processVoiceSubmission] Starting for telegramId=${telegramId}, replyTo=${replyToMessageId || 'none'}, fileId=${fileId}`);
     
@@ -423,10 +424,18 @@ export class AudioSubmissionsService {
       const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = Buffer.from(arrayBuffer);
 
-      // Определяем расширение файла (ogg для голосовых, mp4 для видео-заметок)
-      const filename = submission.answerType === 'VIDEO' ? 'audio.mp4' : 'audio.ogg';
+      // Определяем расширение файла и тип
+      // Для видео-файлов используем mp4, для голосовых - ogg
+      // Whisper может обработать оба типа, но лучше указать правильное расширение
+      let filename: string;
+      if (fileType === 'VIDEO' || submission.answerType === 'VIDEO') {
+        // Для обычных видео-файлов и video_note используем mp4
+        filename = 'video.mp4';
+      } else {
+        filename = 'audio.ogg';
+      }
 
-      this.logger.log(`Downloaded audio file, size: ${audioBuffer.length} bytes`);
+      this.logger.log(`Downloaded ${fileType === 'VIDEO' ? 'video' : 'audio'} file, size: ${audioBuffer.length} bytes`);
 
       // 4. ВАЖНО: Сохраняем answerFileId СРАЗУ, чтобы файл не потерялся при ошибках транскрипции/ИИ
       await this.prisma.submission.update({
