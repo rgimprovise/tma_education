@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ExportFormat } from './dto/export-params.dto';
 import { SubmissionExportRow } from './dto/submission-export-row.dto';
 import { UserProgressExportRow } from './dto/user-progress-export-row.dto';
+import * as ExcelJS from 'exceljs';
 
 /**
  * Опции для экспорта сдач
@@ -504,6 +505,308 @@ export class ExportService {
       return lastName;
     }
     return 'Не указано';
+  }
+
+  /**
+   * Создать полный экспорт всех таблиц базы данных по курсу в Excel
+   * Каждая таблица на отдельном листе
+   * 
+   * @param courseId - ID курса
+   * @returns Buffer с Excel файлом
+   */
+  async buildFullDatabaseExport(courseId: string): Promise<Buffer> {
+    // Проверяем, что курс существует
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, title: true },
+    });
+
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    // Получаем все модули курса
+    const modules = await this.prisma.courseModule.findMany({
+      where: { courseId: courseId },
+      select: { id: true },
+    });
+
+    const moduleIds = modules.map((m) => m.id);
+
+    // Создаем Excel workbook
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'MINTO Education System';
+    workbook.created = new Date();
+    workbook.modified = new Date();
+
+    // 1. Лист User - все пользователи, связанные с курсом
+    const users = await this.prisma.user.findMany({
+      where: {
+        OR: [
+          { enrollments: { some: { moduleId: { in: moduleIds } } } },
+          { submissions: { some: { moduleId: { in: moduleIds } } } },
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const userSheet = workbook.addWorksheet('User');
+    userSheet.columns = [
+      { header: 'id', key: 'id', width: 30 },
+      { header: 'telegramId', key: 'telegramId', width: 20 },
+      { header: 'firstName', key: 'firstName', width: 20 },
+      { header: 'lastName', key: 'lastName', width: 20 },
+      { header: 'position', key: 'position', width: 30 },
+      { header: 'role', key: 'role', width: 15 },
+      { header: 'profileCompleted', key: 'profileCompleted', width: 15 },
+      { header: 'createdAt', key: 'createdAt', width: 25 },
+      { header: 'updatedAt', key: 'updatedAt', width: 25 },
+    ];
+    userSheet.addRows(users);
+
+    // 2. Лист CourseModule - модули курса
+    const courseModules = await this.prisma.courseModule.findMany({
+      where: { courseId: courseId },
+      include: {
+        course: {
+          select: { title: true },
+        },
+      },
+      orderBy: { index: 'asc' },
+    });
+
+    const moduleSheet = workbook.addWorksheet('CourseModule');
+    moduleSheet.columns = [
+      { header: 'id', key: 'id', width: 30 },
+      { header: 'courseId', key: 'courseId', width: 30 },
+      { header: 'courseTitle', key: 'courseTitle', width: 40 },
+      { header: 'index', key: 'index', width: 10 },
+      { header: 'title', key: 'title', width: 40 },
+      { header: 'description', key: 'description', width: 50 },
+      { header: 'isExam', key: 'isExam', width: 10 },
+      { header: 'autoUnlockForNewLearners', key: 'autoUnlockForNewLearners', width: 20 },
+      { header: 'createdAt', key: 'createdAt', width: 25 },
+      { header: 'updatedAt', key: 'updatedAt', width: 25 },
+    ];
+    moduleSheet.addRows(
+      courseModules.map((m) => ({
+        ...m,
+        courseTitle: m.course?.title || null,
+      })),
+    );
+
+    // 3. Лист CourseStep - шаги модулей курса
+    const courseSteps = await this.prisma.courseStep.findMany({
+      where: { moduleId: { in: moduleIds } },
+      include: {
+        module: {
+          select: { title: true, index: true },
+        },
+      },
+      orderBy: [{ module: { index: 'asc' } }, { index: 'asc' }],
+    });
+
+    const stepSheet = workbook.addWorksheet('CourseStep');
+    stepSheet.columns = [
+      { header: 'id', key: 'id', width: 30 },
+      { header: 'moduleId', key: 'moduleId', width: 30 },
+      { header: 'moduleTitle', key: 'moduleTitle', width: 40 },
+      { header: 'moduleIndex', key: 'moduleIndex', width: 15 },
+      { header: 'index', key: 'index', width: 10 },
+      { header: 'type', key: 'type', width: 15 },
+      { header: 'title', key: 'title', width: 40 },
+      { header: 'content', key: 'content', width: 60 },
+      { header: 'requiresAiReview', key: 'requiresAiReview', width: 20 },
+      { header: 'expectedAnswer', key: 'expectedAnswer', width: 15 },
+      { header: 'maxScore', key: 'maxScore', width: 10 },
+      { header: 'aiRubric', key: 'aiRubric', width: 60 },
+      { header: 'isRequired', key: 'isRequired', width: 15 },
+      { header: 'createdAt', key: 'createdAt', width: 25 },
+      { header: 'updatedAt', key: 'updatedAt', width: 25 },
+    ];
+    stepSheet.addRows(
+      courseSteps.map((s) => ({
+        ...s,
+        moduleTitle: s.module.title,
+        moduleIndex: s.module.index,
+        module: undefined,
+      })),
+    );
+
+    // 4. Лист Enrollment - прогресс по модулям курса
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { moduleId: { in: moduleIds } },
+      include: {
+        user: {
+          select: { firstName: true, lastName: true, telegramId: true },
+        },
+        module: {
+          select: { title: true, index: true },
+        },
+        unlockedBy: {
+          select: { firstName: true, lastName: true },
+        },
+      },
+      orderBy: [{ user: { lastName: 'asc' } }, { module: { index: 'asc' } }],
+    });
+
+    const enrollmentSheet = workbook.addWorksheet('Enrollment');
+    enrollmentSheet.columns = [
+      { header: 'id', key: 'id', width: 30 },
+      { header: 'userId', key: 'userId', width: 30 },
+      { header: 'userName', key: 'userName', width: 30 },
+      { header: 'userTelegramId', key: 'userTelegramId', width: 20 },
+      { header: 'moduleId', key: 'moduleId', width: 30 },
+      { header: 'moduleTitle', key: 'moduleTitle', width: 40 },
+      { header: 'moduleIndex', key: 'moduleIndex', width: 15 },
+      { header: 'status', key: 'status', width: 15 },
+      { header: 'unlockedById', key: 'unlockedById', width: 30 },
+      { header: 'unlockedByName', key: 'unlockedByName', width: 30 },
+      { header: 'unlockedAt', key: 'unlockedAt', width: 25 },
+      { header: 'completedAt', key: 'completedAt', width: 25 },
+    ];
+    enrollmentSheet.addRows(
+      enrollments.map((e) => ({
+        ...e,
+        userName: this.formatUserName(e.user.firstName, e.user.lastName),
+        userTelegramId: e.user.telegramId,
+        moduleTitle: e.module.title,
+        moduleIndex: e.module.index,
+        unlockedByName: e.unlockedBy
+          ? this.formatUserName(e.unlockedBy.firstName, e.unlockedBy.lastName)
+          : null,
+        user: undefined,
+        module: undefined,
+        unlockedBy: undefined,
+      })),
+    );
+
+    // 5. Лист Submission - сдачи по курсу
+    const submissions = await this.prisma.submission.findMany({
+      where: { moduleId: { in: moduleIds } },
+      include: {
+        user: {
+          select: { firstName: true, lastName: true, telegramId: true },
+        },
+        module: {
+          select: { title: true, index: true },
+        },
+        step: {
+          select: { title: true, index: true, type: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const submissionSheet = workbook.addWorksheet('Submission');
+    submissionSheet.columns = [
+      { header: 'id', key: 'id', width: 30 },
+      { header: 'userId', key: 'userId', width: 30 },
+      { header: 'userName', key: 'userName', width: 30 },
+      { header: 'userTelegramId', key: 'userTelegramId', width: 20 },
+      { header: 'moduleId', key: 'moduleId', width: 30 },
+      { header: 'moduleTitle', key: 'moduleTitle', width: 40 },
+      { header: 'moduleIndex', key: 'moduleIndex', width: 15 },
+      { header: 'stepId', key: 'stepId', width: 30 },
+      { header: 'stepTitle', key: 'stepTitle', width: 40 },
+      { header: 'stepIndex', key: 'stepIndex', width: 15 },
+      { header: 'stepType', key: 'stepType', width: 15 },
+      { header: 'answerText', key: 'answerText', width: 60 },
+      { header: 'answerFileId', key: 'answerFileId', width: 30 },
+      { header: 'answerType', key: 'answerType', width: 15 },
+      { header: 'aiScore', key: 'aiScore', width: 10 },
+      { header: 'aiFeedback', key: 'aiFeedback', width: 60 },
+      { header: 'curatorScore', key: 'curatorScore', width: 15 },
+      { header: 'curatorFeedback', key: 'curatorFeedback', width: 60 },
+      { header: 'status', key: 'status', width: 20 },
+      { header: 'resubmissionRequested', key: 'resubmissionRequested', width: 20 },
+      { header: 'resubmissionRequestedAt', key: 'resubmissionRequestedAt', width: 25 },
+      { header: 'telegramPromptMessageId', key: 'telegramPromptMessageId', width: 25 },
+      { header: 'createdAt', key: 'createdAt', width: 25 },
+      { header: 'updatedAt', key: 'updatedAt', width: 25 },
+    ];
+    submissionSheet.addRows(
+      submissions.map((s) => ({
+        ...s,
+        userName: this.formatUserName(s.user.firstName, s.user.lastName),
+        userTelegramId: s.user.telegramId,
+        moduleTitle: s.module.title,
+        moduleIndex: s.module.index,
+        stepTitle: s.step.title,
+        stepIndex: s.step.index,
+        stepType: s.step.type,
+        user: undefined,
+        module: undefined,
+        step: undefined,
+      })),
+    );
+
+    // 6. Лист SubmissionHistory - история сдач по курсу
+    const submissionHistories = await this.prisma.submissionHistory.findMany({
+      where: {
+        submission: {
+          moduleId: { in: moduleIds },
+        },
+      },
+      include: {
+        submission: {
+          include: {
+            user: {
+              select: { firstName: true, lastName: true },
+            },
+            step: {
+              select: { title: true },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const historySheet = workbook.addWorksheet('SubmissionHistory');
+    historySheet.columns = [
+      { header: 'id', key: 'id', width: 30 },
+      { header: 'submissionId', key: 'submissionId', width: 30 },
+      { header: 'userName', key: 'userName', width: 30 },
+      { header: 'stepTitle', key: 'stepTitle', width: 40 },
+      { header: 'answerText', key: 'answerText', width: 60 },
+      { header: 'answerFileId', key: 'answerFileId', width: 30 },
+      { header: 'answerType', key: 'answerType', width: 15 },
+      { header: 'aiScore', key: 'aiScore', width: 10 },
+      { header: 'aiFeedback', key: 'aiFeedback', width: 60 },
+      { header: 'curatorScore', key: 'curatorScore', width: 15 },
+      { header: 'curatorFeedback', key: 'curatorFeedback', width: 60 },
+      { header: 'status', key: 'status', width: 20 },
+      { header: 'reason', key: 'reason', width: 20 },
+      { header: 'createdAt', key: 'createdAt', width: 25 },
+    ];
+    historySheet.addRows(
+      submissionHistories.map((h) => ({
+        ...h,
+        userName: this.formatUserName(
+          h.submission.user.firstName,
+          h.submission.user.lastName,
+        ),
+        stepTitle: h.submission.step.title,
+        submission: undefined,
+      })),
+    );
+
+    // Применяем стили к заголовкам
+    [userSheet, moduleSheet, stepSheet, enrollmentSheet, submissionSheet, historySheet].forEach(
+      (sheet) => {
+        sheet.getRow(1).font = { bold: true };
+        sheet.getRow(1).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFE0E0E0' },
+        };
+      },
+    );
+
+    // Генерируем Excel файл в Buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 }
 

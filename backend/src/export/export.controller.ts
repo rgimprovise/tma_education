@@ -203,6 +203,59 @@ export class AdminExportController {
   }
 
   /**
+   * GET /admin/export/full-database
+   * Полный экспорт всех таблиц базы данных по курсу в Excel
+   * Каждая таблица на отдельном листе
+   * 
+   * Query параметры:
+   * - courseId (required) - ID курса
+   * 
+   * Пример запроса:
+   * GET /admin/export/full-database?courseId=xxx
+   * 
+   * Возвращает Excel файл (.xlsx) с листами:
+   * - User - все пользователи, связанные с курсом
+   * - CourseModule - модули курса
+   * - CourseStep - шаги модулей курса
+   * - Enrollment - прогресс по модулям курса
+   * - Submission - сдачи по курсу
+   * - SubmissionHistory - история сдач по курсу
+   */
+  @Get('full-database')
+  @Roles(UserRole.ADMIN, UserRole.CURATOR)
+  async exportFullDatabase(
+    @Res() res: Response,
+    @Query('courseId') courseId: string,
+  ) {
+    if (!courseId) {
+      throw new BadRequestException('courseId is required');
+    }
+
+    // Получаем информацию о курсе для имени файла
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { title: true },
+    });
+
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    // Генерируем Excel файл
+    const excelBuffer = await this.exportService.buildFullDatabaseExport(courseId);
+
+    // Устанавливаем заголовки ответа
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `полный_экспорт_${course.title.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_')}_${dateStr}.xlsx`;
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+
+    // Отправляем файл
+    res.send(excelBuffer);
+  }
+
+  /**
    * POST /admin/export/send-telegram
    * Экспортировать данные по сдачам и отправить через Telegram
    * 
