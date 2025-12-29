@@ -256,6 +256,84 @@ export class AdminExportController {
   }
 
   /**
+   * POST /admin/export/full-database/send-telegram
+   * Полный экспорт всех таблиц базы данных по курсу в Excel и отправка через Telegram
+   * 
+   * Body параметры:
+   * - courseId (required) - ID курса
+   */
+  @Post('full-database/send-telegram')
+  @Roles(UserRole.ADMIN, UserRole.CURATOR)
+  async exportFullDatabaseAndSendTelegram(
+    @Request() req: any,
+    @Body() body: { courseId: string },
+  ) {
+    const { courseId } = body;
+
+    if (!courseId) {
+      throw new BadRequestException('courseId is required');
+    }
+
+    // Получаем текущего пользователя
+    const userId = req.user.id;
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { telegramId: true, firstName: true, lastName: true },
+    });
+
+    if (!user || !user.telegramId) {
+      throw new NotFoundException('User not found or has no Telegram ID');
+    }
+
+    // Получаем информацию о курсе
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { title: true },
+    });
+
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    // Генерируем Excel файл
+    const excelBuffer = await this.exportService.buildFullDatabaseExport(courseId);
+
+    // Формируем имя файла и подпись
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `полный_экспорт_${course.title.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_')}_${dateStr}.xlsx`;
+    
+    const caption = `📊 Полный экспорт базы данных\n\n` +
+      `Курс: ${course.title}\n` +
+      `Дата генерации: ${new Date().toLocaleDateString('ru-RU', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })}\n\n` +
+      `📋 Содержит 6 листов:\n` +
+      `• User - пользователи\n` +
+      `• CourseModule - модули\n` +
+      `• CourseStep - шаги\n` +
+      `• Enrollment - прогресс\n` +
+      `• Submission - сдачи\n` +
+      `• SubmissionHistory - история`;
+
+    // Отправляем через Telegram бот
+    await this.telegramService.sendDocument(
+      user.telegramId,
+      excelBuffer,
+      filename,
+      caption,
+    );
+
+    return {
+      success: true,
+      message: 'Полный экспорт отправлен в Telegram',
+    };
+  }
+
+  /**
    * POST /admin/export/send-telegram
    * Экспортировать данные по сдачам и отправить через Telegram
    * 

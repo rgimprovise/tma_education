@@ -1503,15 +1503,15 @@ ${submission.curatorFeedback || 'Требуется доработка'}
   }
 
   /**
-   * Отправить HTML-файл (отчёт) пользователю
+   * Отправить файл (HTML, Excel и т.д.) пользователю
    * @param telegramId - Telegram ID пользователя
-   * @param htmlContent - Содержимое HTML файла
+   * @param content - Содержимое файла (строка или Buffer)
    * @param filename - Имя файла
    * @param caption - Подпись к файлу (опционально)
    */
   async sendDocument(
     telegramId: string,
-    htmlContent: string,
+    content: string | Buffer,
     filename: string,
     caption?: string,
   ): Promise<any> {
@@ -1521,16 +1521,28 @@ ${submission.curatorFeedback || 'Требуется доработка'}
     }
 
     try {
-      // Создаём InputFile из строки HTML
-      const file = new InputFile(
-        Buffer.from(htmlContent, 'utf-8'),
-        filename,
-      );
+      // Создаём InputFile из строки или Buffer
+      let file: InputFile;
+      if (typeof content === 'string') {
+        // Если это base64 строка, декодируем её
+        if (content.match(/^[A-Za-z0-9+/=]+$/)) {
+          file = new InputFile(Buffer.from(content, 'base64'), filename);
+        } else {
+          // Обычная строка (HTML)
+          file = new InputFile(Buffer.from(content, 'utf-8'), filename);
+        }
+      } else {
+        // Buffer
+        file = new InputFile(content, filename);
+      }
 
-      const sentMessage = await this.bot.api.sendDocument(telegramId, file, {
-        caption,
-        parse_mode: 'HTML',
-      });
+      // Определяем parse_mode только для HTML файлов
+      const options: any = { caption };
+      if (filename.endsWith('.html') && typeof content === 'string') {
+        options.parse_mode = 'HTML';
+      }
+
+      const sentMessage = await this.bot.api.sendDocument(telegramId, file, options);
 
       this.logger.debug(`Document sent to ${telegramId}, message_id: ${sentMessage.message_id}`);
       return sentMessage;

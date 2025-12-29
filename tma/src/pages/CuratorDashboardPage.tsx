@@ -310,7 +310,7 @@ export function CuratorDashboardPage() {
         </div>
       </div>
 
-      <div className="learners-list">
+        <div className="learners-list">
         <h2 className="section-title">
           Участники ({displayedLearners.length} из {learners.length}):
         </h2>

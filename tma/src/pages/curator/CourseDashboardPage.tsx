@@ -366,6 +366,30 @@ export function CourseDashboardPage() {
     }
   };
 
+  const handleExportFullDatabase = async () => {
+    if (!courseId) return;
+
+    try {
+      await api.post('/admin/export/full-database/send-telegram', {
+        courseId,
+      });
+
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert('✅ Полный экспорт базы данных отправлен в Telegram!');
+      } else {
+        alert('✅ Полный экспорт базы данных отправлен в Telegram!');
+      }
+    } catch (err: any) {
+      console.error('Failed to export full database:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Ошибка экспорта базы данных';
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(`❌ ${errorMessage}`);
+      } else {
+        alert(`❌ ${errorMessage}`);
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="course-dashboard">
@@ -496,6 +520,19 @@ export function CourseDashboardPage() {
             }}
           >
             📤 Отправить отчёт в Telegram
+          </button>
+          
+          <button 
+            className="btn btn-primary" 
+            onClick={handleExportFullDatabase}
+            style={{ 
+              width: '100%',
+              padding: '12px 20px',
+              fontSize: '16px',
+              fontWeight: '600',
+            }}
+          >
+            📊 Полный экспорт БД в Excel
           </button>
           
           <div className="export-menu-container" style={{ position: 'relative', width: '100%' }}>
